@@ -398,58 +398,103 @@ function handleSubscriber(actor, tier, isGifted, isCommunity) {
     addSubEvent(actor, displayTier, isGifted, isCommunity);
 }
 
+function tierFromInfo(info) {
+    if (!info) return '1000';
+    if (info.prime) return 'Prime';
+    return info.plan || '1000';
+}
+
+function isPrimeFromInfo(info) {
+    if (!info) return false;
+    return info.prime === true || String(info.plan || '').toLowerCase() === 'prime';
+}
+
+function displayNameFromInfo(username, userstate, sender) {
+    if (sender && sender !== 'null' && sender !== 'undefined') return sender;
+    if (username && username !== 'null' && username !== 'undefined') return username;
+    if (userstate) {
+        const dn = userstate['display-name'] || userstate.displayName || userstate['login'] || '';
+        if (dn) return dn;
+    }
+    return '';
+}
+
+function actorFromInfo(username, userstate, sender, isCommunity) {
+    if (isCommunity) return 'Community';
+    if (sender && sender !== 'null' && sender !== 'undefined') return sender;
+    if (username && username !== 'null' && username !== 'undefined') return username;
+    if (userstate) {
+        const un = userstate['login'] || userstate['display-name'] || userstate.displayName || '';
+        if (un) return un;
+    }
+    return '';
+}
+
 function initComfy() {
     if (!window.ComfyJS) {
         console.error('Goal Overlay: ComfyJS not loaded');
         return;
     }
 
-    window.ComfyJS.onSubscriber = (channelName, username, message, userstate, methods) => {
-        const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || methods?.plan || (userstate['subPlan']));
-        const displayName = username && username !== 'null' && username !== 'undefined' ? username : (userstate?.['display-name'] || userstate?.displayName || userstate?.['login'] || '');
-        if (tier && String(tier).toLowerCase() === 'prime') {
-            handleSubscriber(displayName || username || '', 'Prime', false, false);
-            return;
-        }
-        handleSubscriber(displayName || username || '', tier || '1000', false, false);
+    // onSub: new (non-resub, non-gift) subscription
+    // ComfyJS 1.1.29 signature: onSub(user, message, subTierInfo, extra)
+    //   subTierInfo = { prime, plan, planName } from tmi.js methods object
+    window.ComfyJS.onSub = (user, message, subTierInfo, extra) => {
+        const tier = tierFromInfo(subTierInfo);
+        const displayName = displayNameFromInfo(user, subTierInfo, undefined);
+        const actor = actorFromInfo(user, subTierInfo, undefined, false);
+        handleSubscriber(actor, tier, false, false);
     };
 
-    window.ComfyJS.onSubGift = (channelName, username, sender, userstate, methods) => {
-        const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || methods?.plan || userstate['subPlan']);
-        const displayName = (sender && sender !== 'null' && sender !== 'undefined') ? sender : ((username && username !== 'null') ? username : (userstate?.['display-name'] || userstate?.displayName || ''));
-        handleSubscriber(displayName || '', tier || '1000', true, false);
+    // onSubGift: gifted subscription
+    // ComfyJS 1.1.29 signature: onSubGift(gifterUser, streakMonths, recipientUser, senderCount, subTierInfo, extra)
+    //   subTierInfo = { prime, plan, planName }
+    // Note: old code had (channelName, username, sender, userstate, methods) — wrong arg order
+    window.ComfyJS.onSubGift = (gifterUser, streakMonths, recipientUser, senderCount, subTierInfo, extra) => {
+        const tier = tierFromInfo(subTierInfo);
+        const displayName = displayNameFromInfo(undefined, subTierInfo, gifterUser);
+        const actor = actorFromInfo(undefined, subTierInfo, gifterUser, false);
+        handleSubscriber(actor, tier, true, false);
     };
 
-    window.ComfyJS.onCommunitySubGift = (channelName, username, userstate, methods) => {
-        const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || methods?.plan || userstate['subPlan']);
-        handleSubscriber('Community', tier || '1000', true, true);
+    // onResub: subscription renewal
+    // ComfyJS 1.1.29 signature: onResub(user, message, streakMonths, cumulativeMonths, subTierInfo, extra)
+    //   subTierInfo = { prime, plan, planName }
+    window.ComfyJS.onResub = (user, message, streakMonths, cumulativeMonths, subTierInfo, extra) => {
+        const tier = tierFromInfo(subTierInfo);
+        const displayName = displayNameFromInfo(user, subTierInfo, undefined);
+        const actor = actorFromInfo(user, subTierInfo, undefined, false);
+        handleSubscriber(actor, tier, false, false);
     };
 
-    window.ComfyJS.onPrimePaidUpgrade = (channelName, username, userstate) => {
-        const displayName = username && username !== 'null' ? username : (userstate?.['display-name'] || userstate?.displayName || '');
-        handleSubscriber(displayName || '', 'Prime', false, false);
+    // onSubMysteryGift: mystery/community gift subscription
+    // ComfyJS 1.1.29 signature: onSubMysteryGift(gifterUser, numbOfSubs, senderCount, subTierInfo, extra)
+    //   subTierInfo = { prime, plan, planName }
+    window.ComfyJS.onSubMysteryGift = (gifterUser, numbOfSubs, senderCount, subTierInfo, extra) => {
+        const tier = tierFromInfo(subTierInfo);
+        const displayName = displayNameFromInfo(undefined, subTierInfo, gifterUser);
+        const actor = actorFromInfo(undefined, subTierInfo, gifterUser, true);
+        handleSubscriber(actor, tier, true, true);
     };
 
-    window.ComfyJS.onPrime = (channelName, username, message, userstate, methods) => {
-        const displayName = username && username !== 'null' && username !== 'undefined' ? username : (userstate?.['display-name'] || userstate?.displayName || userstate?.['login'] || '');
-        handleSubscriber(displayName || '', 'Prime', false, false);
+    // onGiftSubContinue: continuing a gifted sub
+    // ComfyJS 1.1.29 signature: onGiftSubContinue(username, sender, extra)
+    //   username = recipient login, sender = gifter name (may be null if anonymous),
+    //   extra = { gifterUsername, gifterDisplayName } — ComfyJS does not forward
+    //   sub-plan info, so we default to Tier 1 (the old code also always fell back to '1000').
+    window.ComfyJS.onGiftSubContinue = (username, sender, extra) => {
+        const tier = '1000';
+        const displayName = displayNameFromInfo(undefined, undefined, sender);
+        const actor = actorFromInfo(undefined, undefined, sender, false);
+        handleSubscriber(actor, tier, true, false);
     };
 
-    window.ComfyJS.onResub = (channelName, username, months, message, userstate, methods) => {
-        const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || methods?.plan || userstate['subPlan']);
-        const displayName = username && username !== 'null' && username !== 'undefined' ? username : (userstate?.['display-name'] || userstate?.displayName || userstate?.['login'] || '');
-        if (tier && String(tier).toLowerCase() === 'prime') {
-            handleSubscriber(displayName || username || '', 'Prime', false, false);
-            return;
-        }
-        handleSubscriber(displayName || username || '', tier || '1000', false, false);
-    };
+    // Community sub gifts in ComfyJS come through onSubGift or onSubMysteryGift;
+    // there is no standalone onCommunitySubGift event. The old handler is removed.
 
-    window.ComfyJS.onGiftSubContinue = (channelName, username, sender, userstate) => {
-        const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || userstate['subPlan'] || '1000');
-        const displayName = (sender && sender !== 'null' && sender !== 'undefined') ? sender : ((username && username !== 'null') ? username : (userstate?.['display-name'] || userstate?.displayName || ''));
-        handleSubscriber(displayName || '', tier, true, false);
-    };
+    // Prime upgrades/paid upgrades come through onPrimePaidUpgrade in old code
+    // but ComfyJS does not emit that event. Prime subs come through onSub/onResub
+    // with subTierInfo.prime = true, so no separate handler needed.
 
     try {
         window.ComfyJS.Init(channel);
