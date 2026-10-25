@@ -53,6 +53,8 @@ const $goalStyle = document.getElementById('goal-style');
 const $overlayWidth = document.getElementById('overlay-width');
 const $eventsFade = document.getElementById('events-fade');
 const $eventsFadeMs = document.getElementById('events-fade-ms');
+const $manualPoints = document.getElementById('manual-points');
+const $btnSetPoints = document.getElementById('btn-set-points');
 const $keyNone = document.getElementById('key-none');
 const $keyVal = document.getElementById('key-val');
 const $btnCopyUrl = document.getElementById('btn-copy-url');
@@ -290,6 +292,19 @@ $btnCopyUrl.addEventListener('click', async () => {
 
 $btnSave.addEventListener('click', saveSettingsToStorage);
 
+if ($btnSetPoints) {
+    $btnSetPoints.addEventListener('click', () => {
+        if (!channel) { flash('Enter your channel first'); return; }
+        const pts = Math.max(0, parseInt($manualPoints && $manualPoints.value, 10) || 0);
+        if (bridge && bridge.isConnected()) {
+            bridge.send('setPoints', { points: pts });
+            flash('Points set to ' + pts);
+        } else {
+            flash('Overlay not connected to room');
+        }
+    });
+}
+
 if ($goalLabel) $goalLabel.addEventListener('input', updatePreviewLive);
 if ($goalTarget) $goalTarget.addEventListener('input', updatePreviewLive);
 if ($subTier1) $subTier1.addEventListener('input', updatePreviewLive);
@@ -325,8 +340,8 @@ function sendTest(tier, isGifted) {
 function sendTestReset() {
     if (!channel) { flash('Enter your channel first'); return; }
     if (bridge && bridge.isConnected()) {
-        bridge.sendResetPoints({});
-        flash('Test: Points reset');
+        bridge.sendResetPoints({ type: 'test' });
+        flash('Test events cleared from history');
     } else {
         flash('Overlay not connected to room');
     }
