@@ -267,7 +267,20 @@ function disconnectOverlay(reason) {
 }
 
 function handleSubscriber(actor, tier, isGifted, isCommunity) {
-    // Always count personal subs; gifted/prime/community can be controlled by hiding in overlay only
+    const isPrime = isPrimeSub({ 'sub-plan': tier });
+    // If hidden in overlay, don't count for goal
+    if (isCommunity && settings.hideCommunityInOverlay) {
+        addSubEvent(actor, tier, isGifted, isCommunity);
+        return;
+    }
+    if (isGifted && !isCommunity && settings.hideGiftedInOverlay) {
+        addSubEvent(actor, tier, isGifted, isCommunity);
+        return;
+    }
+    if (isPrime && !isGifted && !isCommunity && settings.hidePrimeInOverlay) {
+        addSubEvent(actor, tier, isGifted, isCommunity);
+        return;
+    }
     addPoints(tier);
     addSubEvent(actor, tier, isGifted, isCommunity);
 }
