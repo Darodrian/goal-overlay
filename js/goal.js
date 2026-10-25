@@ -100,7 +100,7 @@ function addSubEvent(username, tier, isGifted, isCommunity) {
     } else if (isGifted) {
         text = actor + ' gifted ' + name + ' sub';
     } else if (isPrime) {
-        text = actor + ' subscribed with Prime ' + name;
+        text = actor + ' subscribed with Prime';
     } else {
         text = actor + ' subscribed ' + name;
     }
