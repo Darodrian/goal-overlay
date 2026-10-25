@@ -259,6 +259,7 @@ $channel.addEventListener('change', () => {
     const newCh = norm(ch);
     if (newCh !== norm(channel)) {
         // Different channel – persist and fully refresh.
+        channel = ch;
         localStorage.setItem('goal_overlay_last_channel', ch);
         location.reload();
     }
