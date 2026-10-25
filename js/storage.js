@@ -4,10 +4,6 @@
 
 const STORAGE_PREFIX = 'goal_overlay_';
 
-function norm(channel) {
-    return String(channel || '').trim().toLowerCase();
-}
-
 function storageKey(channel, suffix) {
     return STORAGE_PREFIX + norm(channel) + '_' + suffix;
 }
