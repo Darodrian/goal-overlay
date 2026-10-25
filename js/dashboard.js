@@ -254,25 +254,14 @@ async function copyText(text) {
 
 // ---- channel input ----
 $channel.addEventListener('change', () => {
-    const ch = norm($channel.value.trim());
-    if (!ch) return;
-    const newCh = norm(ch);
-    if (newCh !== norm(channel)) {
-        // Different channel – persist and fully refresh.
-        channel = ch;
-        localStorage.setItem('goal_overlay_last_channel', ch);
-        location.reload();
-    }
-    channel = ch;
-    key = getKey(channel);
-    showKey();
-    loadSettingsFor(channel);
-    startRoom();
-    updatePreview();
+    // Intentionally no-op: channel changes only take effect when
+    // "Change key" is clicked and the page reloads.
 });
 
 $btnKey.addEventListener('click', async () => {
-    if (!channel) { flash('Enter your channel first'); return; }
+    const ch = norm($channel.value.trim());
+    if (!ch) { flash('Enter your channel first'); return; }
+    channel = ch;
     const had = hasKey(channel);
     if (had) {
         if (!confirm('Generate a new key? The old overlay URL will stop working until you paste the new one in OBS.')) return;
@@ -284,6 +273,7 @@ $btnKey.addEventListener('click', async () => {
     showKey();
     // Store a one-shot flash so the reload can show it once then clear it.
     sessionStorage.setItem('key-generated', had ? 'New key generated and URL copied. Update OBS.' : 'Key generated and URL copied. Paste in OBS.');
+    localStorage.setItem('goal_overlay_last_channel', channel);
     await copyText(buildOverlayUrl(channel, key));
     location.reload();
 });
