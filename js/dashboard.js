@@ -3,6 +3,7 @@ import {
     getKey, saveKey, saveKeyVersion, getKeyVersion, hasKey, generateKey,
     norm,
 } from './storage.js';
+import { createBridge } from './bridge.js';
 
 const DEFAULTS = {
     goalLabel: 'Meta Partner Plus 2',
@@ -20,9 +21,6 @@ const DEFAULTS = {
     displayGiftedSubs: true,
     displayPrimeSubs: true,
     displayCommunityGiftSubs: true,
-    goalDataSource: 'persist',
-    startingPoints: 0,
-    goalManualPoints: 0,
 };
 
 // DOM refs
@@ -62,7 +60,8 @@ let channel = '';
 let key = '';
 let keyVersion = '';
 let settings = { ...DEFAULTS };
-let bc = new BroadcastChannel('goal_overlay_settings');
+let bridge = null;
+let roomGen = 0;
 
 function flash(text, kind = 'accent') {
     $msg.textContent = text;
@@ -144,15 +143,40 @@ function saveSettingsToStorage() {
     };
     saveSettings(channel, s);
     settings = s;
-    // notify overlay in real time (same origin BroadcastChannel)
-    bc.postMessage({ channel: channel });
+    // push live to all connected overlays via Supabase
+    if (bridge && bridge.isConnected()) {
+        bridge.sendSet({ settings: s });
+    }
     flash('Settings saved for ' + channel);
 }
 
-function resetPoints() {
-    if (!channel) { flash('Enter your channel first'); return; }
-    try { localStorage.removeItem('goal_overlay_' + norm(channel) + '_points'); } catch (e) {}
-    flash('Points reset to 0 for ' + channel);
+// ---- supabase room (dashboard <-> overlay) ----
+async function startRoom() {
+    const gen = ++roomGen;
+    if (bridge) { await bridge.leave(); bridge = null; }
+    if (!channel || !key) { setOverlay('', 'No channel'); return; }
+    setOverlay('busy', 'Connecting...');
+    try {
+        const b = createBridge(key);
+        b.onStatus((s) => {
+            if (s === 'CHANNEL_ERROR') setOverlay('err', 'Key rejected');
+            else if (s === 'CLOSED') setOverlay('', 'Room closed');
+        });
+        b.onHello(() => {
+            setOverlay('live', 'Overlay connected');
+            // confirm current settings to any overlay that just joined
+            b.sendSet({ settings });
+        });
+        await b.connect();
+        if (gen !== roomGen) { await b.leave(); return; }
+        bridge = b;
+        b.sendSet({ settings });
+        setOverlay('busy', 'Waiting for overlay...');
+    } catch (e) {
+        if (gen !== roomGen) return;
+        const m = e?.message ?? '';
+        setOverlay('err', m === 'CHANNEL_ERROR' ? 'Key rejected' : m === 'TIMED_OUT' ? 'No response' : 'Could not connect to room');
+    }
 }
 
 async function copyText(text) {
@@ -179,6 +203,7 @@ $channel.addEventListener('change', () => {
     keyVersion = getKeyVersion(channel);
     showKey();
     loadSettingsFor(channel);
+    startRoom();
     updatePreview();
 });
 
@@ -193,8 +218,12 @@ $btnKey.addEventListener('click', async () => {
     keyVersion = (parseInt(keyVersion || '0', 10) + 1).toString();
     saveKeyVersion(channel, keyVersion);
     showKey();
+    // tell any connected overlay its session is invalid, then rotate the room
+    if (bridge && bridge.isConnected()) {
+        bridge.sendKeyChanged({ version: keyVersion });
+    }
+    await startRoom();
     updatePreview();
-    bc.postMessage({ channel: channel, type: 'keyChanged', version: keyVersion });
     await copyText(buildOverlayUrl(channel, key));
     flash(had ? 'New key generated and URL copied. Update OBS.' : 'Key generated and URL copied. Paste in OBS.');
 });
@@ -207,6 +236,7 @@ $btnCopyUrl.addEventListener('click', async () => {
 
 $btnSave.addEventListener('click', saveSettingsToStorage);
 
+// ---- test events ----
 $btnTestTier1.addEventListener('click', () => sendTest('1000', false));
 $btnTestTier2.addEventListener('click', () => sendTest('2000', false));
 $btnTestTier3.addEventListener('click', () => sendTest('3000', false));
@@ -217,14 +247,22 @@ $btnTestReset.addEventListener('click', () => sendTestReset());
 function sendTest(tier, isGifted) {
     if (!channel) { flash('Enter your channel first'); return; }
     const username = $testUsername.value.trim() || 'Viewer';
-    bc.postMessage({ channel: channel, type: 'addPoints', tier: tier, username: username, isGifted: isGifted });
-    flash('Test: ' + (isGifted ? 'Gifted ' : '') + 'Tier ' + tier + ' sub by ' + username);
+    if (bridge && bridge.isConnected()) {
+        bridge.sendAddPoints({ tier, username, isGifted });
+        flash('Test: ' + (isGifted ? 'Gifted ' : '') + 'Tier ' + tier + ' sub by ' + username);
+    } else {
+        flash('Overlay not connected to room');
+    }
 }
 
 function sendTestReset() {
     if (!channel) { flash('Enter your channel first'); return; }
-    bc.postMessage({ channel: channel, type: 'resetPoints' });
-    flash('Test: Points reset');
+    if (bridge && bridge.isConnected()) {
+        bridge.sendResetPoints({});
+        flash('Test: Points reset');
+    } else {
+        flash('Overlay not connected to room');
+    }
 }
 
 // ---- init ----
@@ -236,6 +274,7 @@ if (savedChannel) {
     keyVersion = getKeyVersion(channel);
     showKey();
     loadSettingsFor(channel);
+    startRoom();
     updatePreview();
 }
 
