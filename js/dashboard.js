@@ -81,6 +81,9 @@ function showKey() {
     $keyNone.hidden = has;
     $btnCopyUrl.disabled = !has || !channel;
     $btnKey.textContent = has ? 'Change key' : 'Generate key';
+    if (channel) {
+        setOverlay(has ? 'live' : '', 'Channel: ' + channel);
+    }
 }
 
 function buildOverlayUrl(ch, k) {
@@ -179,7 +182,6 @@ $channel.addEventListener('change', () => {
     key = getKey(channel);
     showKey();
     loadSettingsFor(channel);
-    setOverlay('', 'Channel: ' + channel);
     updatePreview();
 });
 
@@ -214,7 +216,6 @@ if (savedChannel) {
     key = getKey(channel);
     showKey();
     loadSettingsFor(channel);
-    setOverlay('', 'Channel: ' + channel);
     updatePreview();
 }
 

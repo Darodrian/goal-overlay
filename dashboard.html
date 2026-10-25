@@ -11,87 +11,81 @@
 </head>
 <body>
 <div class="wrap">
-  <div style="display:flex; flex-direction:column; gap:18px;">
+  <div class="col-left">
     <div>
       <h1>Goal Overlay</h1>
       <div class="status"><span class="dot" id="dot-ov"></span><span id="status-ov">No channel</span></div>
       <div class="msg" id="msg" hidden></div>
     </div>
 
-    <div class="controls">
-      <div class="panel">
-        <h2>Channel</h2>
-        <label class="field">Twitch channel name
-          <input id="channel" spellcheck="false" placeholder="yourchannel">
-        </label>
-        <div class="keybar">
-          <span>Secret key: <em class="none" id="key-none">not generated</em><code id="key-val" hidden></code></span>
-          <button type="button" id="btn-copy-url" disabled>Copy overlay URL</button>
-          <button type="button" id="btn-key">Generate key</button>
-        </div>
-        <p class="note">Paste the overlay URL into OBS as a Browser Source. Only someone with the key can control this overlay.</p>
+    <div class="panel">
+      <h2>Channel</h2>
+      <label class="field">Twitch channel name
+        <input id="channel" spellcheck="false" placeholder="yourchannel">
+      </label>
+      <div class="keybar">
+        <span>Secret key: <em class="none" id="key-none">not generated</em><code id="key-val" hidden></code></span>
+        <button type="button" id="btn-copy-url" disabled>Copy overlay URL</button>
+        <button type="button" id="btn-key">Generate key</button>
       </div>
-
-      <div class="panel">
-        <h2>Goal settings</h2>
-        <label class="field">Caption text
-          <input id="goal-label" type="text" value="Meta Partner Plus 2">
-        </label>
-        <div class="row seg">
-          <label class="field">Overlay width (px)
-            <input id="overlay-width" type="number" min="200" max="1920" step="10" value="600" style="flex:1">
-          </label>
-          <label class="field">Overlay height (px)
-            <input id="overlay-height" type="number" min="100" max="1080" step="10" value="300" style="flex:1">
-          </label>
-        </div>
-        <div class="row seg">
-          <label class="field">Target (points)
-            <input id="goal-target" type="number" min="1" step="1" value="200" style="flex:1">
-          </label>
-          <label class="field">Bar color
-            <input id="goal-color" type="color" value="#946ef9">
-          </label>
-        </div>
-        <label class="field">Points — Tier 1
-          <input id="sub-tier1" type="number" min="0" step="1" value="1">
-        </label>
-        <label class="field">Points — Tier 2
-          <input id="sub-tier2" type="number" min="0" step="1" value="2">
-        </label>
-        <label class="field">Points — Tier 3
-          <input id="sub-tier3" type="number" min="0" step="1" value="6">
-        </label>
-        <div class="row seg">
-          <label class="field"><input id="count-gifted" type="checkbox" checked> Count gifted subs</label>
-          <label class="field"><input id="count-prime" type="checkbox" checked> Count Prime subs</label>
-          <label class="field"><input id="count-community" type="checkbox" checked> Count community gifts</label>
-        </div>
-        <div class="row seg">
-          <label class="field"><input id="display-gifted" type="checkbox" checked> Show gifted subs</label>
-          <label class="field"><input id="display-prime" type="checkbox" checked> Show Prime subs</label>
-          <label class="field"><input id="display-community" type="checkbox" checked> Show community gifts</label>
-        </div>
-        <div class="row seg">
-          <label class="field">Data source
-            <select id="goal-data-source" style="flex:1">
-              <option value="persist">Keep progress between reloads</option>
-              <option value="manual">Use starting points value</option>
-              <option value="reset">Reset to 0 on each load</option>
-            </select>
-          </label>
-          <label class="field">Starting points
-            <input id="starting-points" type="number" min="0" step="1" value="0" style="flex:1">
-          </label>
-          <label class="field">Manual override (0 = off)
-            <input id="goal-manual-points" type="number" min="0" step="1" value="0" style="flex:1">
-          </label>
-        </div>
-        <button type="button" id="btn-save">Save settings</button>
-        <button type="button" id="btn-reset-points">Reset points to 0</button>
-      </div>
+      <p class="note">Paste the overlay URL into OBS as a Browser Source. Only someone with the key can control this overlay.</p>
     </div>
 
+    <div class="panel">
+      <h2>Goal settings</h2>
+      <label class="field">Caption text
+        <input id="goal-label" type="text" value="Meta Partner Plus 2">
+      </label>
+      <label class="field">Overlay width (px)
+        <input id="overlay-width" type="number" min="200" max="1920" step="10" value="600">
+      </label>
+      <label class="field">Overlay height (px)
+        <input id="overlay-height" type="number" min="100" max="1080" step="10" value="300">
+      </label>
+      <label class="field">Target (points)
+        <input id="goal-target" type="number" min="1" step="1" value="200">
+      </label>
+      <label class="field">Bar color
+        <input id="goal-color" type="color" value="#946ef9">
+      </label>
+      <label class="field">Points — Tier 1
+        <input id="sub-tier1" type="number" min="0" step="1" value="1">
+      </label>
+      <label class="field">Points — Tier 2
+        <input id="sub-tier2" type="number" min="0" step="1" value="2">
+      </label>
+      <label class="field">Points — Tier 3
+        <input id="sub-tier3" type="number" min="0" step="1" value="6">
+      </label>
+      <div class="row seg">
+        <label class="field"><input id="count-gifted" type="checkbox" checked> Count gifted subs</label>
+        <label class="field"><input id="count-prime" type="checkbox" checked> Count Prime subs</label>
+        <label class="field"><input id="count-community" type="checkbox" checked> Count community gifts</label>
+      </div>
+      <div class="row seg">
+        <label class="field"><input id="display-gifted" type="checkbox" checked> Show gifted subs</label>
+        <label class="field"><input id="display-prime" type="checkbox" checked> Show Prime subs</label>
+        <label class="field"><input id="display-community" type="checkbox" checked> Show community gifts</label>
+      </div>
+      <label class="field">Data source
+        <select id="goal-data-source" style="flex:1">
+          <option value="persist">Keep progress between reloads</option>
+          <option value="manual">Use starting points value</option>
+          <option value="reset">Reset to 0 on each load</option>
+        </select>
+      </label>
+      <label class="field">Starting points
+        <input id="starting-points" type="number" min="0" step="1" value="0">
+      </label>
+      <label class="field">Manual override (0 = off)
+        <input id="goal-manual-points" type="number" min="0" step="1" value="0">
+      </label>
+      <button type="button" id="btn-save">Save settings</button>
+      <button type="button" id="btn-reset-points">Reset points to 0</button>
+    </div>
+  </div>
+
+  <div class="col-right">
     <div class="panel panel-preview">
       <h2>Preview</h2>
       <div id="preview-shell"><iframe id="preview" title="Goal overlay preview" hidden></iframe></div>

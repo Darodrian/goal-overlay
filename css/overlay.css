@@ -91,3 +91,66 @@ html, body {
 #setup-notice h1 { margin: 0 0 16px 0; font-size: 20px; color: #946ef9; }
 #setup-notice p { margin: 0 0 12px 0; font-size: 15px; line-height: 1.6; }
 #setup-notice code { padding: 1px 5px; background: rgba(148, 110, 249, 0.18); border: 1px solid rgba(148, 110, 249, 0.45); color: #c5b5fb; }
+
+#test-panel {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    z-index: 600;
+    font-family: 'zpix', 'Montserrat', sans-serif;
+    color: #c5b5fb;
+}
+#test-box {
+    max-width: 340px;
+    padding: 16px 18px;
+    background: rgba(10, 10, 30, 0.92);
+    border: 4px solid #946ef9;
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.6);
+    text-align: center;
+}
+#test-box h3 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    color: #946ef9;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+#test-box .test-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+#test-box button {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 2px solid #000000;
+    background: rgba(62, 35, 95, 0.6);
+    color: #c5b5fb;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+#test-box button:hover {
+    background: rgba(148, 110, 249, 0.35);
+    border-color: #946ef9;
+}
+#test-toggle {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 2px solid #946ef9;
+    background: rgba(62, 35, 95, 0.6);
+    color: #c5b5fb;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+#test-toggle:hover {
+    background: rgba(148, 110, 249, 0.3);
+}

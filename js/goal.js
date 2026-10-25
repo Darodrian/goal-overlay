@@ -133,6 +133,12 @@ function addPoints(tier) {
     updateBar();
 }
 
+function resetGoalPoints() {
+    goalCurrentPoints = 0;
+    savePoints(channel, goalCurrentPoints);
+    updateBar();
+}
+
 function handleSubscriber(username, userstate) {
     const isGifted = isGiftedSub({}, userstate);
     const isCommunity = isCommunityGift({}, userstate);
@@ -198,3 +204,14 @@ if (!channel) {
 }
 
 window.addPoints = addPoints;
+window.resetGoalPoints = resetGoalPoints;
+
+// ---- test panel toggle (for offline testing without real Twitch events) ----
+const $testPanel = document.getElementById('test-panel');
+const $testToggle = document.getElementById('test-toggle');
+const $testBox = document.getElementById('test-box');
+if ($testPanel && $testToggle && $testBox) {
+    $testToggle.addEventListener('click', () => {
+        $testBox.hidden = !$testBox.hidden;
+    });
+}
