@@ -62,9 +62,12 @@ const $setupNotice = document.getElementById('setup-notice');
 const $obsUrl = document.getElementById('obs-url');
 
 function pointsForTier(tier) {
-    const t = String(tier);
-    if (t === '3000' || t === '3') return settings.subTier3Points;
-    if (t === '2000' || t === '2') return settings.subTier2Points;
+    const t = String(tier || '').toLowerCase();
+    if (t === 'prime') return settings.subTier1Points;
+    if (t === '3000' || t === '3' || t.includes('3000')) return settings.subTier3Points;
+    if (t === '2000' || t === '2' || t.includes('2000')) return settings.subTier2Points;
+    if (t === '1000' || t === '1' || t.includes('1000')) return settings.subTier1Points;
+    // default to tier 1
     return settings.subTier1Points;
 }
 
@@ -114,9 +117,11 @@ function addSubEvent(username, tier, isGifted, isCommunity) {
 }
 
 function isPrimeSub(userstate) {
-    return userstate['sub-plan'] === 'Prime' ||
+    if (!userstate) return false;
+    const plan = userstate['sub-plan'] || userstate['msg-param-sub-plan'] || userstate.plan;
+    return plan === 'Prime' ||
            userstate['isPrime'] === true ||
-           String(userstate['sub-plan']).toLowerCase() === 'prime';
+           String(plan).toLowerCase() === 'prime';
 }
 
 function isCommunityGift(event, userstate) {
@@ -309,7 +314,7 @@ function disconnectOverlay(reason) {
 }
 
 function handleSubscriber(actor, tier, isGifted, isCommunity) {
-    const isPrime = isPrimeSub({ 'sub-plan': tier });
+    const isPrime = isPrimeSub({ 'sub-plan': tier }) || String(tier).toLowerCase() === 'prime';
     // If hidden in overlay, don't count for goal
     if (isCommunity && settings.hideCommunityInOverlay) {
         addSubEvent(actor, tier, isGifted, isCommunity);
@@ -334,22 +339,40 @@ function initComfy() {
     }
 
     window.ComfyJS.onSubscriber = (channelName, username, message, userstate, methods) => {
-        handleSubscriber(username, userstate['sub-plan'], false, false);
+        const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || methods?.plan || '1000');
+        handleSubscriber(username, tier, false, false);
     };
 
     window.ComfyJS.onSubGift = (channelName, username, sender, userstate, methods) => {
-        handleSubscriber(sender, userstate['sub-plan'], true, false);
+        const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || methods?.plan || '1000');
+        handleSubscriber(sender || username, tier, true, false);
     };
 
     window.ComfyJS.onCommunitySubGift = (channelName, username, userstate, methods) => {
-        handleSubscriber('Community', userstate['sub-plan'], true, true);
+        const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || methods?.plan || '1000');
+        handleSubscriber('Community', tier, true, true);
     };
 
     window.ComfyJS.onPrime = (channelName, username, message, userstate, methods) => {
         handleSubscriber(username, 'Prime', false, false);
     };
 
-    window.ComfyJS.Init(channel);
+    window.ComfyJS.onResub = (channelName, username, months, message, userstate, methods) => {
+        const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || methods?.plan || '1000');
+        handleSubscriber(username, tier, false, false);
+    };
+
+    window.ComfyJS.onGiftSubContinue = (channelName, username, sender, userstate) => {
+        // some events don't fire; try to count based on plan if present
+        const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || '1000');
+        handleSubscriber(sender || username, tier, true, false);
+    };
+
+    try {
+        window.ComfyJS.Init(channel);
+    } catch (e) {
+        console.error('[overlay] ComfyJS init failed', e);
+    }
 }
 
 // ---- entry point ----
