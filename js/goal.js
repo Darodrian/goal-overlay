@@ -377,6 +377,24 @@ function disconnectOverlay(reason) {
     console.log('Goal Overlay session invalid: ' + reason);
 }
 
+function reinitComfy(newChannel) {
+    // Disconnect old ComfyJS session
+    try {
+        if (window.ComfyJS && window.ComfyJS.Disconnect) {
+            window.ComfyJS.Disconnect();
+        }
+    } catch (e) {
+        console.error('[overlay] Failed to disconnect ComfyJS', e);
+    }
+    // Update the channel variable and reinitialize
+    channel = typeof newChannel !== 'undefined' ? newChannel : normChannel();
+    try {
+        initComfy();
+    } catch (e) {
+        console.error('[overlay] Failed to reinitialize ComfyJS', e);
+    }
+}
+
 function handleSubscriber(actor, tier, isGifted, isCommunity) {
     const tierStr = String(tier || '');
     const isPrime = isPrimeSub({ 'sub-plan': tier }) || tierStr.toLowerCase() === 'prime' || tierStr === 'Prime';
@@ -545,3 +563,4 @@ if (!channel) {
 
 window.addPoints = addPoints;
 window.resetGoalPoints = resetGoalPoints;
+window.reinitComfy = reinitComfy;
