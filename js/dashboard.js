@@ -147,9 +147,6 @@ function buildLivePreviewSettings() {
 function updatePreviewLive() {
     if (!channel || !key) return;
     const s = buildLivePreviewSettings();
-    if (bridge && bridge.isConnected()) {
-        bridge.sendSet({ settings: s });
-    }
     if ($preview && !$preview.hidden) {
         try {
             if ($preview.contentWindow && typeof $preview.contentWindow.postMessage === 'function') {
@@ -254,13 +251,17 @@ async function copyText(text) {
 $channel.addEventListener('change', () => {
     const ch = norm($channel.value.trim());
     if (!ch) return;
+    const newCh = norm(ch);
+    if (newCh !== norm(channel)) {
+        // Different channel – persist and fully refresh.
+        localStorage.setItem('goal_overlay_last_channel', ch);
+        location.reload();
+    }
     channel = ch;
     key = getKey(channel);
-    keyVersion = getKeyVersion(channel);
     showKey();
     loadSettingsFor(channel);
     startRoom();
-    window.reinitComfy(ch);
     updatePreview();
 });
 
@@ -275,14 +276,10 @@ $btnKey.addEventListener('click', async () => {
     keyVersion = (parseInt(keyVersion || '0', 10) + 1).toString();
     saveKeyVersion(channel, keyVersion);
     showKey();
-    // tell any connected overlay its session is invalid, then rotate the room
-    if (bridge && bridge.isConnected()) {
-        bridge.sendKeyChanged({ version: keyVersion });
-    }
-    await startRoom();
-    updatePreview();
+    // Store a one-shot flash so the reload can show it once then clear it.
+    sessionStorage.setItem('key-generated', had ? 'New key generated and URL copied. Update OBS.' : 'Key generated and URL copied. Paste in OBS.');
     await copyText(buildOverlayUrl(channel, key));
-    flash(had ? 'New key generated and URL copied. Update OBS.' : 'Key generated and URL copied. Paste in OBS.');
+    location.reload();
 });
 
 $btnCopyUrl.addEventListener('click', async () => {
@@ -357,6 +354,9 @@ if (savedChannel) {
     key = getKey(channel);
     keyVersion = getKeyVersion(channel);
     showKey();
+    // Show one-shot flash from key-generation reload, then clear it.
+    const pending = sessionStorage.getItem('key-generated');
+    if (pending) { flash(pending); sessionStorage.removeItem('key-generated'); }
     loadSettingsFor(channel);
     startRoom();
     updatePreview();

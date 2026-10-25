@@ -50,8 +50,6 @@ let channel = '';
 let settings = { ...DEFAULTS };
 let goalCurrentPoints = 0;
 let goalEnabled = true;
-let overlayKeyVersion = '';
-let validateTimer = null;
 let bridge = null;
 
 // DOM refs
@@ -343,20 +341,8 @@ function resetGoalPoints() {
 // polling so OBS (which doesn't receive BroadcastChannel from the dashboard)
 // also gets invalidated.
 function validateSession() {
-    const storedKey = getKey(channel);
-    const storedVersion = getKeyVersion(channel);
     if (!channel || !key) {
         disconnectOverlay('Missing key.');
-        return false;
-    }
-    if (key !== storedKey) {
-        // URL key is authoritative - sync it (important for OBS cross-context)
-        saveKey(channel, key);
-        overlayKeyVersion = getKeyVersion(channel);
-        return true;
-    }
-    if (overlayKeyVersion !== storedVersion) {
-        disconnectOverlay('Key changed. Generate a new overlay URL in the dashboard.');
         return false;
     }
     return true;
@@ -385,6 +371,21 @@ function reinitComfy(newChannel) {
         }
     } catch (e) {
         console.error('[overlay] Failed to disconnect ComfyJS', e);
+    }
+    // Clear event history for the new channel
+    if ($subEvents) {
+        // Remove existing sub-event items
+        const items = Array.from($subEvents.querySelectorAll('.sub-event'));
+        for (const it of items) {
+            const t = it.textContent || '';
+            // Only remove test events from history; keep regular events
+            // But since we're switching channels, clear all for this overlay
+            it.remove();
+        }
+        // Reset the max displayed events counter
+        while ($subEvents.children.length > 0) {
+            $subEvents.removeChild($subEvents.firstChild);
+        }
     }
     // Update the channel variable and reinitialize
     channel = typeof newChannel !== 'undefined' ? newChannel : normChannel();
@@ -521,7 +522,20 @@ function initComfy() {
     }
 }
 
-window.addEventListener('message', (ev) => {
+// Position spyro indicator based on goal progress
+    const indicator = document.querySelector('.spyro-indicator');
+    if (!indicator) return;
+
+    const pct = goalCurrentPoints / goalTarget;
+    // At 0% goal: indicator at bottom of track (bottom: 0 from CSS)
+    // At 100% goal: indicator at top of track
+    // At 30% goal: "lede" position
+    // Indicator moves UP as goal fills
+    const topPosition = (1 - pct) * 28;
+    indicator.style.top = `${topPosition}px`;
+    indicator.style.bottom = 'auto';
+
+    window.addEventListener('message', (ev) => {
     try {
         if (ev.data && ev.data.type === 'goal-preview') {
             applyLiveSettings(ev.data.settings);
