@@ -35,6 +35,8 @@ const DEFAULTS = {
     hidePrimeInOverlay: false,
     hideCommunityInOverlay: false,
     goalStyle: 'grape',
+    eventsFade: false,
+    eventsFadeAfterMs: 10000,
 };
 
 // DOM refs
@@ -49,6 +51,8 @@ const $hidePrimeOverlay = document.getElementById('hide-prime-overlay');
 const $hideCommunityOverlay = document.getElementById('hide-community-overlay');
 const $goalStyle = document.getElementById('goal-style');
 const $overlayWidth = document.getElementById('overlay-width');
+const $eventsFade = document.getElementById('events-fade');
+const $eventsFadeMs = document.getElementById('events-fade-ms');
 const $keyNone = document.getElementById('key-none');
 const $keyVal = document.getElementById('key-val');
 const $btnCopyUrl = document.getElementById('btn-copy-url');
@@ -133,6 +137,8 @@ function buildLivePreviewSettings() {
         hidePrimeInOverlay: $hidePrimeOverlay.checked,
         hideCommunityInOverlay: $hideCommunityOverlay.checked,
         goalStyle: style,
+        eventsFade: $eventsFade ? $eventsFade.checked : (settings.eventsFade === true),
+        eventsFadeAfterMs: $eventsFadeMs ? (parseInt($eventsFadeMs.value, 10) || 10000) : (settings.eventsFadeAfterMs || 10000),
     };
 }
 
@@ -163,6 +169,8 @@ function loadSettingsFor(ch) {
     $hideCommunityOverlay.checked = settings.hideCommunityInOverlay === true;
     if ($goalStyle) $goalStyle.value = settings.goalStyle || 'grape';
     $overlayWidth.value = settings.overlayWidth;
+    if ($eventsFade) $eventsFade.checked = settings.eventsFade === true;
+    if ($eventsFadeMs) $eventsFadeMs.value = settings.eventsFadeAfterMs || 10000;
     updatePreviewLive();
 }
 
@@ -184,6 +192,8 @@ function saveSettingsToStorage() {
         hidePrimeInOverlay: $hidePrimeOverlay.checked,
         hideCommunityInOverlay: $hideCommunityOverlay.checked,
         goalStyle: style,
+        eventsFade: $eventsFade ? $eventsFade.checked : false,
+        eventsFadeAfterMs: $eventsFadeMs ? (parseInt($eventsFadeMs.value, 10) || 10000) : 10000,
     };
     saveSettings(channel, s);
     settings = s;
@@ -290,6 +300,8 @@ if ($goalStyle) $goalStyle.addEventListener('change', updatePreviewLive);
 if ($hideGiftedOverlay) $hideGiftedOverlay.addEventListener('change', updatePreviewLive);
 if ($hidePrimeOverlay) $hidePrimeOverlay.addEventListener('change', updatePreviewLive);
 if ($hideCommunityOverlay) $hideCommunityOverlay.addEventListener('change', updatePreviewLive);
+if ($eventsFade) $eventsFade.addEventListener('change', updatePreviewLive);
+if ($eventsFadeMs) $eventsFadeMs.addEventListener('input', updatePreviewLive);
 
 // ---- test events ----
 $btnTestTier1.addEventListener('click', () => sendTest('1000', false));

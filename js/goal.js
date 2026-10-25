@@ -37,6 +37,8 @@ const DEFAULTS = {
     hidePrimeInOverlay: false,
     hideCommunityInOverlay: false,
     goalStyle: 'grape',
+    eventsFade: false,
+    eventsFadeAfterMs: 10000,
     goalDataSource: 'persist',
     startingPoints: 0,
     goalManualPoints: 0,
@@ -83,37 +85,49 @@ function tierName(tier) {
 function addSubEvent(username, tier, isGifted, isCommunity) {
     if (!$subEvents) return;
 
-    const isPrime = String(tier).toLowerCase() === 'prime';
+    const isPrime = isPrimeSub({ 'sub-plan': tier }) || String(tier).toLowerCase() === 'prime';
     if (isCommunity && settings.hideCommunityInOverlay) return;
     if (isGifted && !isCommunity && settings.hideGiftedInOverlay) return;
     if (isPrime && !isGifted && !isCommunity && settings.hidePrimeInOverlay) return;
 
     const name = tierName(tier);
+    const actor = (username && username !== 'null' && username !== 'undefined') ? username : (isCommunity ? 'Community' : 'Someone');
     let text;
     if (isCommunity) {
-        text = 'Community gifted ' + name + ' sub';
+        text = actor + ' gifted ' + name + ' sub (community)';
     } else if (isGifted) {
-        text = username + ' gifted ' + name + ' sub';
+        text = actor + ' gifted ' + name + ' sub';
     } else if (isPrime) {
-        text = username + ' subscribed with Prime';
+        text = actor + ' subscribed with Prime';
     } else {
-        text = username + ' subscribed ' + name;
+        text = actor + ' subscribed ' + name;
     }
 
+    const pts = pointsForTier(tier);
     const item = document.createElement('div');
     item.className = 'sub-event';
-    item.textContent = text;
+    const left = document.createElement('span');
+    left.className = 'sub-event-text';
+    left.textContent = text;
+    const right = document.createElement('span');
+    right.className = 'sub-event-points';
+    right.textContent = '+' + pts;
+    item.appendChild(left);
+    item.appendChild(right);
 
     $subEvents.insertBefore(item, $subEvents.firstChild);
 
-    while ($subEvents.children.length > 5) {
+    while ($subEvents.children.length > 20) {
         $subEvents.removeChild($subEvents.lastChild);
     }
 
-    setTimeout(() => {
-        item.style.opacity = '0';
-        setTimeout(() => { if (item.parentNode) item.remove(); }, 500);
-    }, 10000);
+    if (settings.eventsFade === true) {
+        const fadeAfter = Math.max(1000, parseInt(settings.eventsFadeAfterMs, 10) || 10000);
+        setTimeout(() => {
+            item.style.opacity = '0';
+            setTimeout(() => { if (item.parentNode) item.remove(); }, 500);
+        }, fadeAfter);
+    }
 }
 
 function isPrimeSub(userstate) {
@@ -151,6 +165,10 @@ function updateBar() {
 function applySize() {
     $goalContainer.style.width = settings.overlayWidth + 'px';
     $goalContainer.style.height = settings.overlayHeight + 'px';
+    const wrap = document.getElementById('sub-events-wrap');
+    if (wrap) wrap.style.width = settings.overlayWidth + 'px';
+    const hist = document.querySelector('.sub-events-history');
+    if (hist) hist.style.width = '100%';
 }
 
 function applyPalette(styleName) {
@@ -362,12 +380,14 @@ function initComfy() {
 
     window.ComfyJS.onSubscriber = (channelName, username, message, userstate, methods) => {
         const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || methods?.plan || '1000');
-        handleSubscriber(username, tier, false, false);
+        const displayName = username && username !== 'null' && username !== 'undefined' ? username : (userstate?.displayName || userstate?.['display-name'] || '');
+        handleSubscriber(displayName || 'Someone', tier, false, false);
     };
 
     window.ComfyJS.onSubGift = (channelName, username, sender, userstate, methods) => {
         const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || methods?.plan || '1000');
-        handleSubscriber(sender || username, tier, true, false);
+        const displayName = (sender && sender !== 'null' && sender !== 'undefined') ? sender : ((username && username !== 'null') ? username : (userstate?.displayName || 'Someone'));
+        handleSubscriber(displayName, tier, true, false);
     };
 
     window.ComfyJS.onCommunitySubGift = (channelName, username, userstate, methods) => {
@@ -376,18 +396,20 @@ function initComfy() {
     };
 
     window.ComfyJS.onPrime = (channelName, username, message, userstate, methods) => {
-        handleSubscriber(username, 'Prime', false, false);
+        const displayName = username && username !== 'null' && username !== 'undefined' ? username : (userstate?.displayName || userstate?.['display-name'] || 'Someone');
+        handleSubscriber(displayName, 'Prime', false, false);
     };
 
     window.ComfyJS.onResub = (channelName, username, months, message, userstate, methods) => {
         const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || methods?.plan || '1000');
-        handleSubscriber(username, tier, false, false);
+        const displayName = username && username !== 'null' && username !== 'undefined' ? username : (userstate?.displayName || 'Someone');
+        handleSubscriber(displayName, tier, false, false);
     };
 
     window.ComfyJS.onGiftSubContinue = (channelName, username, sender, userstate) => {
-        // some events don't fire; try to count based on plan if present
         const tier = userstate && (userstate['sub-plan'] || userstate['msg-param-sub-plan'] || '1000');
-        handleSubscriber(sender || username, tier, true, false);
+        const displayName = (sender && sender !== 'null' && sender !== 'undefined') ? sender : ((username && username !== 'null') ? username : (userstate?.displayName || 'Someone'));
+        handleSubscriber(displayName, tier, true, false);
     };
 
     try {

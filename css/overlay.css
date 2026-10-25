@@ -37,6 +37,11 @@ html, body {
     box-sizing: border-box;
 }
 
+#sub-events-wrap {
+    width: 600px;
+    box-sizing: border-box;
+}
+
 .goal-bar {
     position: absolute;
     top: 50%;
@@ -82,9 +87,9 @@ html, body {
 .sub-events-history {
     position: relative;
     width: 100%;
-    max-height: 140px;
+    max-height: 200px;
     overflow-y: auto;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--goal-color-text, #c5b5fb);
     text-shadow: 1px 1px 0 var(--goal-color-text-shadow, #000000);
     background: rgba(10, 10, 30, 0.2);
@@ -94,14 +99,26 @@ html, body {
 .sub-events-history::-webkit-scrollbar { width: 6px; }
 .sub-events-history::-webkit-scrollbar-thumb { background: var(--goal-color-1, rgba(148, 110, 249, 0.4)); border-radius: 3px; }
 .sub-event {
-    padding: 6px 10px;
+    padding: 4px 8px;
     border-bottom: 1px solid rgba(255,255,255,0.06);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
     animation: subPop 0.3s ease;
 }
 .sub-event:last-child { border-bottom: 0; }
+.sub-event-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+.sub-event-points {
+    color: var(--goal-color-1, #946ef9);
+    font-weight: 700;
+    flex-shrink: 0;
+}
 .sub-event .tier { color: var(--goal-color-1, #946ef9); font-weight: 700; }
 @keyframes subPop {
     from { opacity: 0; transform: translateY(6px); }
