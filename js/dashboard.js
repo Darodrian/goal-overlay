@@ -50,6 +50,12 @@ const $btnCopyUrl = document.getElementById('btn-copy-url');
 const $btnKey = document.getElementById('btn-key');
 const $btnSave = document.getElementById('btn-save');
 const $btnResetPoints = document.getElementById('btn-reset-points');
+const $btnTestTier1 = document.getElementById('btn-test-tier1');
+const $btnTestTier2 = document.getElementById('btn-test-tier2');
+const $btnTestTier3 = document.getElementById('btn-test-tier3');
+const $btnTestGift1 = document.getElementById('btn-test-gift1');
+const $btnTestGift2 = document.getElementById('btn-test-gift2');
+const $btnTestReset = document.getElementById('btn-test-reset');
 const $dotOv = document.getElementById('dot-ov');
 const $statusOv = document.getElementById('status-ov');
 const $msg = document.getElementById('msg');
@@ -207,6 +213,25 @@ $btnCopyUrl.addEventListener('click', async () => {
 
 $btnSave.addEventListener('click', saveSettingsToStorage);
 $btnResetPoints.addEventListener('click', resetPoints);
+
+$btnTestTier1.addEventListener('click', () => sendTest('1000'));
+$btnTestTier2.addEventListener('click', () => sendTest('2000'));
+$btnTestTier3.addEventListener('click', () => sendTest('3000'));
+$btnTestGift1.addEventListener('click', () => sendTest('1000'));
+$btnTestGift2.addEventListener('click', () => sendTest('2000'));
+$btnTestReset.addEventListener('click', () => sendTestReset());
+
+function sendTest(tier) {
+    if (!channel) { flash('Enter your channel first'); return; }
+    bc.postMessage({ channel: channel, type: 'addPoints', tier: tier });
+    flash('Test: Tier ' + tier + ' sub');
+}
+
+function sendTestReset() {
+    if (!channel) { flash('Enter your channel first'); return; }
+    bc.postMessage({ channel: channel, type: 'resetPoints' });
+    flash('Test: Points reset');
+}
 
 // ---- init ----
 const savedChannel = localStorage.getItem('goal_overlay_last_channel');

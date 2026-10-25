@@ -59,5 +59,8 @@ button:disabled { opacity: 0.35; cursor: default; }
 .keybar button { padding: 5px 10px; font-size: 11px; }
 .keybar .none { font-style: italic; }
 .note { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.test-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.test-row button { flex: 1 1 auto; min-width: 0; padding: 8px 10px; font-size: 12px; }
+.panel-test .test-row { gap: 6px; }
 #preview-shell { position: relative; width: 100%; height: 640px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #000; display: flex; align-items: center; justify-content: center; }
 #preview { width: 100%; height: 100%; border: 0; display: block; }

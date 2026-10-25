@@ -115,15 +115,22 @@ function initGoal() {
     // listen for settings changes from dashboard (BroadcastChannel, same origin)
     const bc = new BroadcastChannel('goal_overlay_settings');
     bc.onmessage = (ev) => {
-        if (ev.data && ev.data.channel === channel) {
-            settings = getSettings(channel, DEFAULTS);
-            $goalLabel.textContent = settings.goalLabel;
-            goalEnabled = settings.goalBarEnabled !== false;
-            document.querySelector('.goal-bar').style.display = goalEnabled ? '' : 'none';
-            document.documentElement.style.setProperty('--goal-color-1', settings.goalBarColor);
-            applySize();
-            updateBar();
+        if (!ev.data || ev.data.channel !== channel) return;
+        if (ev.data.type === 'addPoints') {
+            addPoints(ev.data.tier);
+            return;
         }
+        if (ev.data.type === 'resetPoints') {
+            resetGoalPoints();
+            return;
+        }
+        settings = getSettings(channel, DEFAULTS);
+        $goalLabel.textContent = settings.goalLabel;
+        goalEnabled = settings.goalBarEnabled !== false;
+        document.querySelector('.goal-bar').style.display = goalEnabled ? '' : 'none';
+        document.documentElement.style.setProperty('--goal-color-1', settings.goalBarColor);
+        applySize();
+        updateBar();
     };
 }
 
@@ -205,13 +212,3 @@ if (!channel) {
 
 window.addPoints = addPoints;
 window.resetGoalPoints = resetGoalPoints;
-
-// ---- test panel toggle (for offline testing without real Twitch events) ----
-const $testPanel = document.getElementById('test-panel');
-const $testToggle = document.getElementById('test-toggle');
-const $testBox = document.getElementById('test-box');
-if ($testPanel && $testToggle && $testBox) {
-    $testToggle.addEventListener('click', () => {
-        $testBox.hidden = !$testBox.hidden;
-    });
-}
