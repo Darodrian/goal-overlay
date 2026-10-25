@@ -34,6 +34,7 @@ const DEFAULTS = {
     hideGiftedInOverlay: false,
     hidePrimeInOverlay: false,
     hideCommunityInOverlay: false,
+    showSpyroIndicator: true,
     goalStyle: 'grape',
     eventsFade: false,
     eventsFadeAfterMs: 10000,
@@ -49,6 +50,7 @@ const $subTier3 = document.getElementById('sub-tier3');
 const $hideGiftedOverlay = document.getElementById('hide-gifted-overlay');
 const $hidePrimeOverlay = document.getElementById('hide-prime-overlay');
 const $hideCommunityOverlay = document.getElementById('hide-community-overlay');
+const $showSpyroIndicator = document.getElementById('show-spyro-indicator');
 const $goalStyle = document.getElementById('goal-style');
 const $overlayWidth = document.getElementById('overlay-width');
 const $eventsFade = document.getElementById('events-fade');
@@ -138,6 +140,7 @@ function buildLivePreviewSettings() {
         hideGiftedInOverlay: $hideGiftedOverlay.checked,
         hidePrimeInOverlay: $hidePrimeOverlay.checked,
         hideCommunityInOverlay: $hideCommunityOverlay.checked,
+        showSpyroIndicator: $showSpyroIndicator.checked,
         goalStyle: style,
         eventsFade: $eventsFade ? $eventsFade.checked : (settings.eventsFade === true),
         eventsFadeAfterMs: $eventsFadeMs ? (parseInt($eventsFadeMs.value, 10) || 10000) : (settings.eventsFadeAfterMs || 10000),
@@ -166,6 +169,7 @@ function loadSettingsFor(ch) {
     $hideGiftedOverlay.checked = settings.hideGiftedInOverlay === true;
     $hidePrimeOverlay.checked = settings.hidePrimeInOverlay === true;
     $hideCommunityOverlay.checked = settings.hideCommunityInOverlay === true;
+    if ($showSpyroIndicator) $showSpyroIndicator.checked = settings.showSpyroIndicator === true;
     if ($goalStyle) $goalStyle.value = settings.goalStyle || 'grape';
     $overlayWidth.value = settings.overlayWidth;
     if ($eventsFade) $eventsFade.checked = settings.eventsFade === true;
@@ -190,6 +194,7 @@ function saveSettingsToStorage() {
         hideGiftedInOverlay: $hideGiftedOverlay.checked,
         hidePrimeInOverlay: $hidePrimeOverlay.checked,
         hideCommunityInOverlay: $hideCommunityOverlay.checked,
+        showSpyroIndicator: $showSpyroIndicator.checked,
         goalStyle: style,
         eventsFade: $eventsFade ? $eventsFade.checked : false,
         eventsFadeAfterMs: $eventsFadeMs ? (parseInt($eventsFadeMs.value, 10) || 10000) : 10000,
@@ -313,6 +318,7 @@ if ($goalStyle) $goalStyle.addEventListener('change', updatePreviewLive);
 if ($hideGiftedOverlay) $hideGiftedOverlay.addEventListener('change', updatePreviewLive);
 if ($hidePrimeOverlay) $hidePrimeOverlay.addEventListener('change', updatePreviewLive);
 if ($hideCommunityOverlay) $hideCommunityOverlay.addEventListener('change', updatePreviewLive);
+if ($showSpyroIndicator) $showSpyroIndicator.addEventListener('change', updatePreviewLive);
 if ($eventsFade) $eventsFade.addEventListener('change', updatePreviewLive);
 if ($eventsFadeMs) $eventsFadeMs.addEventListener('input', updatePreviewLive);
 

@@ -73,6 +73,7 @@ html, body {
     overflow: hidden;
     border: 2px solid var(--goal-color-border, #000000);
     box-sizing: border-box;
+    position: relative;
 }
 
 .goal-fill {
@@ -87,13 +88,13 @@ html, body {
 .spyro-indicator {
     position: absolute;
     bottom: 0;
-    left: 50%;
+    left: 0;
     transform: translateX(-50%);
     width: 49px;
     height: 64px;
     pointer-events: none;
     z-index: 10;
-    transition: top 0.3s ease;
+    transition: left 0.3s ease;
 }
 
 .sub-events-history {
@@ -108,8 +109,8 @@ html, body {
     border-top: 1px solid rgba(255,255,255,0.06);
     box-sizing: border-box;
 }
-.sub-events-history::-webkit-scrollbar { width: 6px; }
-.sub-events-history::-webkit-scrollbar-thumb { background: var(--goal-color-1, rgba(148, 110, 249, 0.4)); border-radius: 3px; }
+.sub-events-history::-webkit-scrollbar { display: none; }
+.sub-events-history { -ms-overflow-style: none; scrollbar-width: none; }
 .sub-event {
     padding: 4px 8px;
     border-bottom: 1px solid rgba(255,255,255,0.06);

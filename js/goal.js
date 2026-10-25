@@ -36,6 +36,7 @@ const DEFAULTS = {
     hideGiftedInOverlay: false,
     hidePrimeInOverlay: false,
     hideCommunityInOverlay: false,
+    showSpyroIndicator: true,
     goalStyle: 'grape',
     eventsFade: false,
     eventsFadeAfterMs: 10000,
@@ -517,17 +518,22 @@ function initComfy() {
 }
 
 function positionSpyroIndicator() {
+    if (!settings.showSpyroIndicator) {
+        const indicator = document.querySelector('.spyro-indicator');
+        if (indicator) indicator.style.display = 'none';
+        return;
+    }
     const indicator = document.querySelector('.spyro-indicator');
     if (!indicator) return;
+    indicator.style.display = 'block';
     const pct = settings.goalTarget > 0
         ? Math.min(goalCurrentPoints / settings.goalTarget, 1)
         : 0;
-    // At 0% goal: indicator at bottom of track (bottom: 0 from CSS)
-    // At 100% goal: indicator at top of track
-    // Indicator moves UP as goal fills
-    const topPosition = (1 - pct) * 28;
-    indicator.style.top = `${topPosition}px`;
-    indicator.style.bottom = 'auto';
+    // Spyro sits at the bottom ledge of the track
+    // Moves horizontally as the goal fills
+    indicator.style.left = `${pct * 100}%`;
+    indicator.style.top = 'auto';
+    indicator.style.bottom = '0';
 }
 
 window.addEventListener('message', (ev) => {
