@@ -50,6 +50,7 @@ const DEFAULTS = {
 let channel = '';
 let settings = { ...DEFAULTS };
 let goalCurrentPoints = 0;
+let testPoints = 0;
 let goalEnabled = true;
 let bridge = null;
 
@@ -283,11 +284,18 @@ async function connectRoom() {
             }
             // test events from dashboard add points
             addPoints(displayTier);
+            testPoints += pointsForTier(tier);
             addSubEvent(payload.username || 'Viewer', displayTier, isGifted, false);
         });
         b.onResetPoints((payload) => {
             if (!validateSession()) return;
+            // Remove only test-event points from the goal; real sub points stay
+            goalCurrentPoints = Math.max(0, goalCurrentPoints - testPoints);
+            savePoints(channel, goalCurrentPoints);
+            updateBar();
+            positionSpyroIndicator();
             // reset only test events from history
+            testPoints = 0;
             if ($subEvents) {
                 const items = Array.from($subEvents.querySelectorAll('.sub-event'));
                 for (const it of items) {
@@ -297,11 +305,6 @@ async function connectRoom() {
                     }
                 }
             }
-            // Also reset goal points for test events
-            goalCurrentPoints = 0;
-            savePoints(channel, goalCurrentPoints);
-            updateBar();
-            positionSpyroIndicator();
         });
         b.onSetPoints((payload) => {
             if (!validateSession()) return;
