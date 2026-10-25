@@ -232,7 +232,17 @@ function resetGoalPoints() {
 function validateSession() {
     const storedKey = getKey(channel);
     const storedVersion = getKeyVersion(channel);
-    if (!channel || !key || !storedKey || key !== storedKey || overlayKeyVersion !== storedVersion) {
+    if (!channel || !key) {
+        disconnectOverlay('Missing key.');
+        return false;
+    }
+    if (key !== storedKey) {
+        // URL key is authoritative - sync it (important for OBS cross-context)
+        saveKey(channel, key);
+        overlayKeyVersion = getKeyVersion(channel);
+        return true;
+    }
+    if (overlayKeyVersion !== storedVersion) {
         disconnectOverlay('Key changed. Generate a new overlay URL in the dashboard.');
         return false;
     }
@@ -301,17 +311,24 @@ if (!channel) {
     settings = { ...DEFAULTS };
     initGoal();
 } else {
-    // key validation: if a key exists for this channel, it must match
+    // Use URL key as source of truth (critical for OBS Browser Source where localStorage may differ)
     const storedKey = getKey(channel);
-    if (storedKey && storedKey !== key) {
+    if (key) {
+        if (storedKey !== key) {
+            saveKey(channel, key);
+            // also update key version to match
+        }
+        overlayKeyVersion = getKeyVersion(channel);
+        initGoal();
+        initComfy();
+    } else if (storedKey) {
         $setupNotice.classList.add('show');
         $obsUrl.textContent = location.origin + location.pathname + '?c=' + channel + '&k=' + storedKey;
     } else {
-        if (key && !storedKey) {
-            saveKey(channel, key);
-        }
+        $setupNotice.classList.add('show');
+        $obsUrl.textContent = location.origin + location.pathname + '?c=yourchannel&k=yourkey';
+        settings = { ...DEFAULTS };
         initGoal();
-        initComfy();
     }
 }
 
