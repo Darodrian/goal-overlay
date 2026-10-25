@@ -45,9 +45,6 @@
       <label class="field">Target (points)
         <input id="goal-target" type="number" min="1" step="1" value="200">
       </label>
-      <label class="field">Bar color
-        <input id="goal-color" type="color" value="#946ef9">
-      </label>
       <label class="field">Points — Tier 1
         <input id="sub-tier1" type="number" min="0" step="1" value="1">
       </label>
@@ -67,25 +64,22 @@
         <label class="field"><input id="display-prime" type="checkbox" checked> Show Prime subs</label>
         <label class="field"><input id="display-community" type="checkbox" checked> Show community gifts</label>
       </div>
-      <label class="field">Data source
-        <select id="goal-data-source" style="flex:1">
-          <option value="persist">Keep progress between reloads</option>
-          <option value="manual">Use starting points value</option>
-          <option value="reset">Reset to 0 on each load</option>
-        </select>
-      </label>
-      <label class="field">Starting points
-        <input id="starting-points" type="number" min="0" step="1" value="0">
-      </label>
-      <label class="field">Manual override (0 = off)
-        <input id="goal-manual-points" type="number" min="0" step="1" value="0">
-      </label>
       <button type="button" id="btn-save">Save settings</button>
-      <button type="button" id="btn-reset-points">Reset points to 0</button>
+    </div>
+  </div>
+
+  <div class="col-right">
+    <div class="panel panel-preview">
+      <h2>Preview</h2>
+      <div id="preview-shell"><iframe id="preview" title="Goal overlay preview" hidden></iframe></div>
+      <p class="note" id="preview-note">Generate a key to preview the overlay that goes into OBS.</p>
     </div>
 
     <div class="panel panel-test">
       <h2>Test events</h2>
+      <label class="field">Username
+        <input id="test-username" type="text" placeholder="Viewer" value="TestUser">
+      </label>
       <div class="test-row">
         <button type="button" id="btn-test-tier1">Tier 1 sub</button>
         <button type="button" id="btn-test-tier2">Tier 2 sub</button>
@@ -96,14 +90,6 @@
         <button type="button" id="btn-test-gift2">Gifted Tier 2</button>
       </div>
       <button type="button" id="btn-test-reset">Reset points</button>
-    </div>
-  </div>
-
-  <div class="col-right">
-    <div class="panel panel-preview">
-      <h2>Preview</h2>
-      <div id="preview-shell"><iframe id="preview" title="Goal overlay preview" hidden></iframe></div>
-      <p class="note" id="preview-note">Generate a key to preview the overlay that goes into OBS.</p>
     </div>
   </div>
 </div>

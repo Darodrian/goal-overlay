@@ -38,6 +38,7 @@ const $goalLabel = document.getElementById('goal-label');
 const $goalProgress = document.getElementById('goal-progress');
 const $goalFill = document.getElementById('goal-fill');
 const $goalContainer = document.getElementById('goal-container');
+const $subEvents = document.getElementById('sub-events');
 const $setupNotice = document.getElementById('setup-notice');
 const $obsUrl = document.getElementById('obs-url');
 
@@ -46,6 +47,46 @@ function pointsForTier(tier) {
     if (t === '3000' || t === '3') return settings.subTier3Points;
     if (t === '2000' || t === '2') return settings.subTier2Points;
     return settings.subTier1Points;
+}
+
+function tierName(tier) {
+    const t = String(tier);
+    if (t === '3000' || t === '3') return 'Tier 3';
+    if (t === '2000' || t === '2') return 'Tier 2';
+    if (t === '1000' || t === '1') return 'Tier 1';
+    if (t === 'Prime' || t.toLowerCase() === 'prime') return 'Prime';
+    return 'Tier ' + t;
+}
+
+function addSubEvent(username, tier, isGifted, isCommunity) {
+    if (!$subEvents) return;
+
+    const name = tierName(tier);
+    let text;
+    if (isCommunity) {
+        text = 'Community gifted ' + name + ' sub';
+    } else if (isGifted) {
+        text = username + ' gifted ' + name + ' sub';
+    } else if (String(tier).toLowerCase() === 'prime') {
+        text = username + ' subscribed with Prime';
+    } else {
+        text = username + ' subscribed ' + name;
+    }
+
+    const item = document.createElement('div');
+    item.className = 'sub-event';
+    item.textContent = text;
+
+    $subEvents.insertBefore(item, $subEvents.firstChild);
+
+    while ($subEvents.children.length > 5) {
+        $subEvents.removeChild($subEvents.lastChild);
+    }
+
+    setTimeout(() => {
+        item.style.opacity = '0';
+        setTimeout(() => { if (item.parentNode) item.remove(); }, 500);
+    }, 10000);
 }
 
 function isPrimeSub(userstate) {
@@ -118,6 +159,7 @@ function initGoal() {
         if (!ev.data || ev.data.channel !== channel) return;
         if (ev.data.type === 'addPoints') {
             addPoints(ev.data.tier);
+            addSubEvent(ev.data.username || 'Viewer', ev.data.tier, ev.data.isGifted === true, false);
             return;
         }
         if (ev.data.type === 'resetPoints') {
@@ -146,18 +188,15 @@ function resetGoalPoints() {
     updateBar();
 }
 
-function handleSubscriber(username, userstate) {
-    const isGifted = isGiftedSub({}, userstate);
-    const isCommunity = isCommunityGift({}, userstate);
-    const isPrime = isPrimeSub(userstate);
-
+function handleSubscriber(actor, tier, isGifted, isCommunity) {
     // Counting logic
     let shouldCount = true;
     if (isCommunity && !settings.countCommunityGiftSubs) shouldCount = false;
     if (isGifted && !settings.countGiftedSubs) shouldCount = false;
-    if (isPrime && !settings.countPrimeSubs) shouldCount = false;
+    if (isPrimeSub({ 'sub-plan': tier }) && !settings.countPrimeSubs) shouldCount = false;
 
-    if (shouldCount) addPoints(userstate['sub-plan']);
+    if (shouldCount) addPoints(tier);
+    addSubEvent(actor, tier, isGifted, isCommunity);
 }
 
 function initComfy() {
@@ -167,19 +206,19 @@ function initComfy() {
     }
 
     window.ComfyJS.onSubscriber = (channelName, username, message, userstate, methods) => {
-        handleSubscriber(username, userstate);
+        handleSubscriber(username, userstate['sub-plan'], false, false);
     };
 
     window.ComfyJS.onSubGift = (channelName, username, sender, userstate, methods) => {
-        handleSubscriber(username, userstate);
+        handleSubscriber(sender, userstate['sub-plan'], true, false);
     };
 
     window.ComfyJS.onCommunitySubGift = (channelName, username, userstate, methods) => {
-        handleSubscriber(username, userstate);
+        handleSubscriber('Community', userstate['sub-plan'], true, true);
     };
 
     window.ComfyJS.onPrime = (channelName, username, message, userstate, methods) => {
-        handleSubscriber(username, userstate);
+        handleSubscriber(username, 'Prime', false, false);
     };
 
     window.ComfyJS.Init(channel);

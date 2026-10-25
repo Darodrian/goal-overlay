@@ -29,7 +29,6 @@ const DEFAULTS = {
 const $channel = document.getElementById('channel');
 const $goalLabel = document.getElementById('goal-label');
 const $goalTarget = document.getElementById('goal-target');
-const $goalColor = document.getElementById('goal-color');
 const $subTier1 = document.getElementById('sub-tier1');
 const $subTier2 = document.getElementById('sub-tier2');
 const $subTier3 = document.getElementById('sub-tier3');
@@ -39,9 +38,6 @@ const $countCommunity = document.getElementById('count-community');
 const $displayGifted = document.getElementById('display-gifted');
 const $displayPrime = document.getElementById('display-prime');
 const $displayCommunity = document.getElementById('display-community');
-const $goalDataSource = document.getElementById('goal-data-source');
-const $startingPoints = document.getElementById('starting-points');
-const $goalManualPoints = document.getElementById('goal-manual-points');
 const $overlayWidth = document.getElementById('overlay-width');
 const $overlayHeight = document.getElementById('overlay-height');
 const $keyNone = document.getElementById('key-none');
@@ -49,13 +45,13 @@ const $keyVal = document.getElementById('key-val');
 const $btnCopyUrl = document.getElementById('btn-copy-url');
 const $btnKey = document.getElementById('btn-key');
 const $btnSave = document.getElementById('btn-save');
-const $btnResetPoints = document.getElementById('btn-reset-points');
 const $btnTestTier1 = document.getElementById('btn-test-tier1');
 const $btnTestTier2 = document.getElementById('btn-test-tier2');
 const $btnTestTier3 = document.getElementById('btn-test-tier3');
 const $btnTestGift1 = document.getElementById('btn-test-gift1');
 const $btnTestGift2 = document.getElementById('btn-test-gift2');
 const $btnTestReset = document.getElementById('btn-test-reset');
+const $testUsername = document.getElementById('test-username');
 const $dotOv = document.getElementById('dot-ov');
 const $statusOv = document.getElementById('status-ov');
 const $msg = document.getElementById('msg');
@@ -113,7 +109,6 @@ function loadSettingsFor(ch) {
     settings = getSettings(ch, { ...DEFAULTS });
     $goalLabel.value = settings.goalLabel;
     $goalTarget.value = settings.goalTarget;
-    $goalColor.value = settings.goalBarColor;
     $subTier1.value = settings.subTier1Points;
     $subTier2.value = settings.subTier2Points;
     $subTier3.value = settings.subTier3Points;
@@ -123,9 +118,6 @@ function loadSettingsFor(ch) {
     $displayGifted.checked = settings.displayGiftedSubs !== false;
     $displayPrime.checked = settings.displayPrimeSubs !== false;
     $displayCommunity.checked = settings.displayCommunityGiftSubs !== false;
-    $goalDataSource.value = settings.goalDataSource;
-    $startingPoints.value = settings.startingPoints;
-    $goalManualPoints.value = settings.goalManualPoints;
     $overlayWidth.value = settings.overlayWidth;
     $overlayHeight.value = settings.overlayHeight;
 }
@@ -135,7 +127,7 @@ function saveSettingsToStorage() {
     const s = {
         goalLabel: $goalLabel.value,
         goalTarget: parseInt($goalTarget.value, 10) || 200,
-        goalBarColor: $goalColor.value,
+        goalBarColor: '#946ef9',
         goalBarEnabled: true,
         overlayWidth: parseInt($overlayWidth.value, 10) || 600,
         overlayHeight: parseInt($overlayHeight.value, 10) || 300,
@@ -148,9 +140,6 @@ function saveSettingsToStorage() {
         displayGiftedSubs: $displayGifted.checked,
         displayPrimeSubs: $displayPrime.checked,
         displayCommunityGiftSubs: $displayCommunity.checked,
-        goalDataSource: $goalDataSource.value,
-        startingPoints: parseInt($startingPoints.value, 10) || 0,
-        goalManualPoints: parseInt($goalManualPoints.value, 10) || 0,
     };
     saveSettings(channel, s);
     settings = s;
@@ -212,19 +201,19 @@ $btnCopyUrl.addEventListener('click', async () => {
 });
 
 $btnSave.addEventListener('click', saveSettingsToStorage);
-$btnResetPoints.addEventListener('click', resetPoints);
 
-$btnTestTier1.addEventListener('click', () => sendTest('1000'));
-$btnTestTier2.addEventListener('click', () => sendTest('2000'));
-$btnTestTier3.addEventListener('click', () => sendTest('3000'));
-$btnTestGift1.addEventListener('click', () => sendTest('1000'));
-$btnTestGift2.addEventListener('click', () => sendTest('2000'));
+$btnTestTier1.addEventListener('click', () => sendTest('1000', false));
+$btnTestTier2.addEventListener('click', () => sendTest('2000', false));
+$btnTestTier3.addEventListener('click', () => sendTest('3000', false));
+$btnTestGift1.addEventListener('click', () => sendTest('1000', true));
+$btnTestGift2.addEventListener('click', () => sendTest('2000', true));
 $btnTestReset.addEventListener('click', () => sendTestReset());
 
-function sendTest(tier) {
+function sendTest(tier, isGifted) {
     if (!channel) { flash('Enter your channel first'); return; }
-    bc.postMessage({ channel: channel, type: 'addPoints', tier: tier });
-    flash('Test: Tier ' + tier + ' sub');
+    const username = $testUsername.value.trim() || 'Viewer';
+    bc.postMessage({ channel: channel, type: 'addPoints', tier: tier, username: username, isGifted: isGifted });
+    flash('Test: ' + (isGifted ? 'Gifted ' : '') + 'Tier ' + tier + ' sub by ' + username);
 }
 
 function sendTestReset() {
