@@ -163,6 +163,7 @@ function updateBar() {
     $goalFill.style.width = pct + '%';
     $goalProgress.textContent = goalCurrentPoints + ' / ' + settings.goalTarget;
     document.documentElement.style.setProperty('--goal-color-1', settings.goalBarColor);
+    positionSpyroIndicator();
 }
 
 function applySize() {
@@ -244,14 +245,8 @@ function initGoal() {
     savePoints(channel, goalCurrentPoints);
     updateBar();
 
-    overlayKeyVersion = getKeyVersion(channel);
-
     connectRoom();
 
-    // Poll session validity so OBS (no BroadcastChannel from dashboard) also
-    // gets invalidated when the dashboard regenerates the key.
-    if (validateTimer) clearInterval(validateTimer);
-    validateTimer = setInterval(validateSession, 3000);
 }
 
 // ---- supabase room (overlay <- dashboard) ----
@@ -359,7 +354,6 @@ function disconnectOverlay(reason) {
     } catch (e) {}
     $setupNotice.classList.add('show');
     $obsUrl.textContent = location.origin + location.pathname + '?c=' + channel + '&k=' + getKey(channel);
-    if (validateTimer) { clearInterval(validateTimer); validateTimer = null; }
     console.log('Goal Overlay session invalid: ' + reason);
 }
 
@@ -522,20 +516,21 @@ function initComfy() {
     }
 }
 
-// Position spyro indicator based on goal progress
+function positionSpyroIndicator() {
     const indicator = document.querySelector('.spyro-indicator');
     if (!indicator) return;
-
-    const pct = goalCurrentPoints / goalTarget;
+    const pct = settings.goalTarget > 0
+        ? Math.min(goalCurrentPoints / settings.goalTarget, 1)
+        : 0;
     // At 0% goal: indicator at bottom of track (bottom: 0 from CSS)
     // At 100% goal: indicator at top of track
-    // At 30% goal: "lede" position
     // Indicator moves UP as goal fills
     const topPosition = (1 - pct) * 28;
     indicator.style.top = `${topPosition}px`;
     indicator.style.bottom = 'auto';
+}
 
-    window.addEventListener('message', (ev) => {
+window.addEventListener('message', (ev) => {
     try {
         if (ev.data && ev.data.type === 'goal-preview') {
             applyLiveSettings(ev.data.settings);
@@ -561,7 +556,6 @@ if (!channel) {
             saveKey(channel, key);
             // also update key version to match
         }
-        overlayKeyVersion = getKeyVersion(channel);
         initGoal();
         initComfy();
     } else if (storedKey) {
