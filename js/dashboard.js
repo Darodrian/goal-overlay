@@ -5,6 +5,23 @@ import {
 } from './storage.js';
 import { createBridge } from './bridge.js';
 
+const PALETTES = {
+    default: { name: "Default", colors: ["#efa0d7", "#ec90be", "#e1719b", "#c54e69", "#9c2e34", "#511914", "#f6d1f4", "#e53a79", "#bb2a4a", "#9b2227", "#000000"] },
+    yellow: { name: "Yellow", colors: ["#f6ce32", "#f0ad2b", "#d8a328", "#9c711c", "#745916", "#4f4210", "#fef83c", "#e53714", "#c32e11", "#94200c", "#000000"] },
+    red: { name: "Red", colors: ["#e43236", "#c32b28", "#9b241b", "#7c1e10", "#58170f", "#3c0d03", "#ee9e9d", "#e43699", "#c32c60", "#9b2227", "#000000"] },
+    green: { name: "Green", colors: ["#96f444", "#8be33a", "#79c92f", "#4f8d21", "#3c6d19", "#274e12", "#ccf79a", "#c86d1d", "#b64b15", "#77380f", "#000000"] },
+    snow: { name: "Snow", colors: ["#fefbff", "#d9d7da", "#b5b3b6", "#8a898b", "#69686a", "#4a494a", "#fefbff", "#e6525b", "#bc333c", "#9b2227", "#000000"] },
+    carbon: { name: "Carbon", colors: ["#69686a", "#5a585a", "#4a494a", "#3b3b3c", "#333334", "#262526", "#7a797a", "#ed9528", "#e97720", "#b65116", "#000000"] },
+    ocean: { name: "Ocean", colors: ["#97d5fd", "#77b2fb", "#5e92fa", "#3e72f9", "#2c59bb", "#282e6f", "#b3f8fe", "#5a57f8", "#4341d4", "#2b22a8", "#000000"] },
+    sapphire: { name: "Sapphire", colors: ["#7992e9", "#627ad6", "#5269c4", "#224ba9", "#18358f", "#0f216e", "#b3c5fc", "#431cb1", "#361687", "#2f105f", "#000000"] },
+    grape: { name: "Grape", colors: ["#a995fa", "#946ef9", "#7a53f8", "#6025cb", "#532d8f", "#3e235f", "#c5b5fb", "#9e4478", "#7d2a60", "#661848", "#000000"] },
+    emerald: { name: "Emerald", colors: ["#92f5ba", "#66c98f", "#449665", "#35765c", "#2b5e4b", "#214735", "#c5f8dc", "#ee9d4c", "#c9752b", "#a75617", "#000000"] },
+    orange: { name: "Orange", colors: ["#f0ad31", "#ed952d", "#ea772c", "#e75d2d", "#ad441f", "#6f2b16", "#fae738", "#e65118", "#ad3911", "#6f2b16", "#000000"] },
+    chocolate: { name: "Chocolate", colors: ["#c37d5d", "#a8644c", "#884d3d", "#70372e", "#592921", "#431c19", "#c69484", "#842a1b", "#6e1e10", "#5f1508", "#000000"] },
+    cherry: { name: "Cherry", colors: ["#ed91d7", "#ea7abd", "#e0649a", "#c43e68", "#842334", "#511914", "#f6d1f4", "#479556", "#43764d", "#365e37", "#000000"] },
+    chalk: { name: "Chalk", colors: ["#d9d7da", "#b5b3b6", "#939193", "#69686a", "#4a494a", "#2d2c2d", "#fefbff", "#717071", "#515151", "#3b3b3c", "#000000"] }
+};
+
 const DEFAULTS = {
     goalLabel: 'Meta Partner Plus 2',
     goalTarget: 200,
@@ -18,6 +35,7 @@ const DEFAULTS = {
     hideGiftedInOverlay: false,
     hidePrimeInOverlay: false,
     hideCommunityInOverlay: false,
+    goalStyle: 'grape',
 };
 
 // DOM refs
@@ -30,6 +48,7 @@ const $subTier3 = document.getElementById('sub-tier3');
 const $hideGiftedOverlay = document.getElementById('hide-gifted-overlay');
 const $hidePrimeOverlay = document.getElementById('hide-prime-overlay');
 const $hideCommunityOverlay = document.getElementById('hide-community-overlay');
+const $goalStyle = document.getElementById('goal-style');
 const $overlayWidth = document.getElementById('overlay-width');
 const $overlayHeight = document.getElementById('overlay-height');
 const $keyNone = document.getElementById('key-none');
@@ -109,16 +128,19 @@ function loadSettingsFor(ch) {
     $hideGiftedOverlay.checked = settings.hideGiftedInOverlay === true;
     $hidePrimeOverlay.checked = settings.hidePrimeInOverlay === true;
     $hideCommunityOverlay.checked = settings.hideCommunityInOverlay === true;
+    if ($goalStyle) $goalStyle.value = settings.goalStyle || 'grape';
     $overlayWidth.value = settings.overlayWidth;
     $overlayHeight.value = settings.overlayHeight;
 }
 
 function saveSettingsToStorage() {
     if (!channel) { flash('Enter your channel first'); return; }
+    const style = $goalStyle ? $goalStyle.value : 'grape';
+    const pal = PALETTES[style] || PALETTES.grape;
     const s = {
         goalLabel: $goalLabel.value,
         goalTarget: parseInt($goalTarget.value, 10) || 200,
-        goalBarColor: '#946ef9',
+        goalBarColor: pal.colors[1] || '#946ef9',
         goalBarEnabled: true,
         overlayWidth: parseInt($overlayWidth.value, 10) || 600,
         overlayHeight: parseInt($overlayHeight.value, 10) || 300,
@@ -128,6 +150,7 @@ function saveSettingsToStorage() {
         hideGiftedInOverlay: $hideGiftedOverlay.checked,
         hidePrimeInOverlay: $hidePrimeOverlay.checked,
         hideCommunityInOverlay: $hideCommunityOverlay.checked,
+        goalStyle: style,
     };
     saveSettings(channel, s);
     settings = s;
