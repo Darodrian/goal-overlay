@@ -297,6 +297,11 @@ async function connectRoom() {
                     }
                 }
             }
+            // Also reset goal points for test events
+            goalCurrentPoints = 0;
+            savePoints(channel, goalCurrentPoints);
+            updateBar();
+            positionSpyroIndicator();
         });
         b.onSetPoints((payload) => {
             if (!validateSession()) return;

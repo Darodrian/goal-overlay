@@ -70,7 +70,7 @@ html, body {
     height: 28px;
     border-radius: 8px;
     background: var(--goal-color-track, rgba(62, 35, 95, 0.6));
-    overflow: hidden;
+    overflow: visible;
     border: 2px solid var(--goal-color-border, #000000);
     box-sizing: border-box;
     position: relative;

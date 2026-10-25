@@ -345,7 +345,6 @@ function sendTestReset() {
     if (!channel) { flash('Enter your channel first'); return; }
     if (bridge && bridge.isConnected()) {
         bridge.sendResetPoints({ type: 'test' });
-        resetGoalPoints();
         flash('Test events cleared from history');
     } else {
         flash('Overlay not connected to room');
