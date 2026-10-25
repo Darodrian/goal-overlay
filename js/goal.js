@@ -194,8 +194,19 @@ async function connectRoom() {
         });
         b.onAddPoints((payload) => {
             if (!validateSession()) return;
-            addPoints(payload.tier);
-            addSubEvent(payload.username || 'Viewer', payload.tier, payload.isGifted === true, false);
+            const isGifted = payload.isGifted === true;
+            const tier = payload.tier;
+            const isPrime = isPrimeSub({ 'sub-plan': tier });
+            if (isGifted && settings.hideGiftedInOverlay) {
+                addSubEvent(payload.username || 'Viewer', tier, isGifted, false);
+                return;
+            }
+            if (isPrime && !isGifted && settings.hidePrimeInOverlay) {
+                addSubEvent(payload.username || 'Viewer', tier, isGifted, false);
+                return;
+            }
+            addPoints(tier);
+            addSubEvent(payload.username || 'Viewer', tier, isGifted, false);
         });
         b.onResetPoints((payload) => {
             if (!validateSession()) return;
