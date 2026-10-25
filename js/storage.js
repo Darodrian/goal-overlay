@@ -52,6 +52,16 @@ export function hasKey(channel) {
     return getKey(channel).length > 0;
 }
 
+// ---- key version (session) per channel ----
+// Incremented on every key generation so already-open overlays can detect
+// that their key/session has been invalidated and disconnect.
+export function getKeyVersion(channel) {
+    return storageGet(storageKey(channel, 'keyVersion'), '0');
+}
+export function saveKeyVersion(channel, version) {
+    storageSet(storageKey(channel, 'keyVersion'), String(version));
+}
+
 export function generateKey(len = 24) {
     const alphabet = '23456789abcdefghjkmnpqrstuvwxyz';
     const n = alphabet.length;

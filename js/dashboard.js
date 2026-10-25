@@ -1,6 +1,6 @@
 import {
     getSettings, saveSettings,
-    getKey, saveKey, hasKey, generateKey,
+    getKey, saveKey, saveKeyVersion, getKeyVersion, hasKey, generateKey,
     norm,
 } from './storage.js';
 
@@ -60,6 +60,7 @@ const $previewNote = document.getElementById('preview-note');
 
 let channel = '';
 let key = '';
+let keyVersion = '';
 let settings = { ...DEFAULTS };
 let bc = new BroadcastChannel('goal_overlay_settings');
 
@@ -175,6 +176,7 @@ $channel.addEventListener('change', () => {
     if (!ch) return;
     channel = ch;
     key = getKey(channel);
+    keyVersion = getKeyVersion(channel);
     showKey();
     loadSettingsFor(channel);
     updatePreview();
@@ -188,8 +190,11 @@ $btnKey.addEventListener('click', async () => {
     }
     key = generateKey();
     saveKey(channel, key);
+    keyVersion = (parseInt(keyVersion || '0', 10) + 1).toString();
+    saveKeyVersion(channel, keyVersion);
     showKey();
     updatePreview();
+    bc.postMessage({ channel: channel, type: 'keyChanged', version: keyVersion });
     await copyText(buildOverlayUrl(channel, key));
     flash(had ? 'New key generated and URL copied. Update OBS.' : 'Key generated and URL copied. Paste in OBS.');
 });
@@ -228,6 +233,7 @@ if (savedChannel) {
     $channel.value = savedChannel;
     channel = norm(savedChannel);
     key = getKey(channel);
+    keyVersion = getKeyVersion(channel);
     showKey();
     loadSettingsFor(channel);
     updatePreview();
