@@ -15,12 +15,9 @@ const DEFAULTS = {
     subTier1Points: 1,
     subTier2Points: 2,
     subTier3Points: 6,
-    countGiftedSubs: true,
-    countPrimeSubs: true,
-    countCommunityGiftSubs: true,
-    displayGiftedSubs: true,
-    displayPrimeSubs: true,
-    displayCommunityGiftSubs: true,
+    hideGiftedInOverlay: false,
+    hidePrimeInOverlay: false,
+    hideCommunityInOverlay: false,
 };
 
 // DOM refs
@@ -30,12 +27,9 @@ const $goalTarget = document.getElementById('goal-target');
 const $subTier1 = document.getElementById('sub-tier1');
 const $subTier2 = document.getElementById('sub-tier2');
 const $subTier3 = document.getElementById('sub-tier3');
-const $countGifted = document.getElementById('count-gifted');
-const $countPrime = document.getElementById('count-prime');
-const $countCommunity = document.getElementById('count-community');
-const $displayGifted = document.getElementById('display-gifted');
-const $displayPrime = document.getElementById('display-prime');
-const $displayCommunity = document.getElementById('display-community');
+const $hideGiftedOverlay = document.getElementById('hide-gifted-overlay');
+const $hidePrimeOverlay = document.getElementById('hide-prime-overlay');
+const $hideCommunityOverlay = document.getElementById('hide-community-overlay');
 const $overlayWidth = document.getElementById('overlay-width');
 const $overlayHeight = document.getElementById('overlay-height');
 const $keyNone = document.getElementById('key-none');
@@ -112,12 +106,9 @@ function loadSettingsFor(ch) {
     $subTier1.value = settings.subTier1Points;
     $subTier2.value = settings.subTier2Points;
     $subTier3.value = settings.subTier3Points;
-    $countGifted.checked = settings.countGiftedSubs !== false;
-    $countPrime.checked = settings.countPrimeSubs !== false;
-    $countCommunity.checked = settings.countCommunityGiftSubs !== false;
-    $displayGifted.checked = settings.displayGiftedSubs !== false;
-    $displayPrime.checked = settings.displayPrimeSubs !== false;
-    $displayCommunity.checked = settings.displayCommunityGiftSubs !== false;
+    $hideGiftedOverlay.checked = settings.hideGiftedInOverlay === true;
+    $hidePrimeOverlay.checked = settings.hidePrimeInOverlay === true;
+    $hideCommunityOverlay.checked = settings.hideCommunityInOverlay === true;
     $overlayWidth.value = settings.overlayWidth;
     $overlayHeight.value = settings.overlayHeight;
 }
@@ -134,12 +125,9 @@ function saveSettingsToStorage() {
         subTier1Points: parseInt($subTier1.value, 10) || 1,
         subTier2Points: parseInt($subTier2.value, 10) || 2,
         subTier3Points: parseInt($subTier3.value, 10) || 6,
-        countGiftedSubs: $countGifted.checked,
-        countPrimeSubs: $countPrime.checked,
-        countCommunityGiftSubs: $countCommunity.checked,
-        displayGiftedSubs: $displayGifted.checked,
-        displayPrimeSubs: $displayPrime.checked,
-        displayCommunityGiftSubs: $displayCommunity.checked,
+        hideGiftedInOverlay: $hideGiftedOverlay.checked,
+        hidePrimeInOverlay: $hidePrimeOverlay.checked,
+        hideCommunityInOverlay: $hideCommunityOverlay.checked,
     };
     saveSettings(channel, s);
     settings = s;

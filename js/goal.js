@@ -16,12 +16,9 @@ const DEFAULTS = {
     subTier1Points: 1,
     subTier2Points: 2,
     subTier3Points: 6,
-    countGiftedSubs: true,
-    countPrimeSubs: true,
-    countCommunityGiftSubs: true,
-    displayGiftedSubs: true,
-    displayPrimeSubs: true,
-    displayCommunityGiftSubs: true,
+    hideGiftedInOverlay: false,
+    hidePrimeInOverlay: false,
+    hideCommunityInOverlay: false,
     goalDataSource: 'persist',
     startingPoints: 0,
     goalManualPoints: 0,
@@ -65,13 +62,18 @@ function tierName(tier) {
 function addSubEvent(username, tier, isGifted, isCommunity) {
     if (!$subEvents) return;
 
+    const isPrime = String(tier).toLowerCase() === 'prime';
+    if (isCommunity && settings.hideCommunityInOverlay) return;
+    if (isGifted && !isCommunity && settings.hideGiftedInOverlay) return;
+    if (isPrime && !isGifted && !isCommunity && settings.hidePrimeInOverlay) return;
+
     const name = tierName(tier);
     let text;
     if (isCommunity) {
         text = 'Community gifted ' + name + ' sub';
     } else if (isGifted) {
         text = username + ' gifted ' + name + ' sub';
-    } else if (String(tier).toLowerCase() === 'prime') {
+    } else if (isPrime) {
         text = username + ' subscribed with Prime';
     } else {
         text = username + ' subscribed ' + name;
@@ -265,13 +267,8 @@ function disconnectOverlay(reason) {
 }
 
 function handleSubscriber(actor, tier, isGifted, isCommunity) {
-    // Counting logic
-    let shouldCount = true;
-    if (isCommunity && !settings.countCommunityGiftSubs) shouldCount = false;
-    if (isGifted && !settings.countGiftedSubs) shouldCount = false;
-    if (isPrimeSub({ 'sub-plan': tier }) && !settings.countPrimeSubs) shouldCount = false;
-
-    if (shouldCount) addPoints(tier);
+    // Always count personal subs; gifted/prime/community can be controlled by hiding in overlay only
+    addPoints(tier);
     addSubEvent(actor, tier, isGifted, isCommunity);
 }
 
