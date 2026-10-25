@@ -28,7 +28,6 @@ const DEFAULTS = {
     goalBarColor: '#946ef9',
     goalBarEnabled: true,
     overlayWidth: 600,
-    overlayHeight: 300,
     subTier1Points: 1,
     subTier2Points: 2,
     subTier3Points: 6,
@@ -50,7 +49,6 @@ const $hidePrimeOverlay = document.getElementById('hide-prime-overlay');
 const $hideCommunityOverlay = document.getElementById('hide-community-overlay');
 const $goalStyle = document.getElementById('goal-style');
 const $overlayWidth = document.getElementById('overlay-width');
-const $overlayHeight = document.getElementById('overlay-height');
 const $keyNone = document.getElementById('key-none');
 const $keyVal = document.getElementById('key-val');
 const $btnCopyUrl = document.getElementById('btn-copy-url');
@@ -118,6 +116,41 @@ function updatePreview() {
     }
 }
 
+function buildLivePreviewSettings() {
+    const style = $goalStyle ? $goalStyle.value : (settings.goalStyle || 'grape');
+    const pal = PALETTES[style] || PALETTES.grape;
+    return {
+        goalLabel: $goalLabel.value,
+        goalTarget: parseInt($goalTarget.value, 10) || 200,
+        goalBarColor: pal.colors[1] || '#946ef9',
+        goalBarEnabled: true,
+        overlayWidth: parseInt($overlayWidth.value, 10) || 600,
+        overlayHeight: 100,
+        subTier1Points: parseInt($subTier1.value, 10) || 1,
+        subTier2Points: parseInt($subTier2.value, 10) || 2,
+        subTier3Points: parseInt($subTier3.value, 10) || 6,
+        hideGiftedInOverlay: $hideGiftedOverlay.checked,
+        hidePrimeInOverlay: $hidePrimeOverlay.checked,
+        hideCommunityInOverlay: $hideCommunityOverlay.checked,
+        goalStyle: style,
+    };
+}
+
+function updatePreviewLive() {
+    if (!channel || !key) return;
+    const s = buildLivePreviewSettings();
+    if (bridge && bridge.isConnected()) {
+        bridge.sendSet({ settings: s });
+    }
+    if ($preview && !$preview.hidden) {
+        try {
+            if ($preview.contentWindow && typeof $preview.contentWindow.postMessage === 'function') {
+                $preview.contentWindow.postMessage({ type: 'goal-preview', settings: s }, '*');
+            }
+        } catch (e) {}
+    }
+}
+
 function loadSettingsFor(ch) {
     settings = getSettings(ch, { ...DEFAULTS });
     $goalLabel.value = settings.goalLabel;
@@ -130,7 +163,7 @@ function loadSettingsFor(ch) {
     $hideCommunityOverlay.checked = settings.hideCommunityInOverlay === true;
     if ($goalStyle) $goalStyle.value = settings.goalStyle || 'grape';
     $overlayWidth.value = settings.overlayWidth;
-    $overlayHeight.value = settings.overlayHeight;
+    updatePreviewLive();
 }
 
 function saveSettingsToStorage() {
@@ -143,7 +176,7 @@ function saveSettingsToStorage() {
         goalBarColor: pal.colors[1] || '#946ef9',
         goalBarEnabled: true,
         overlayWidth: parseInt($overlayWidth.value, 10) || 600,
-        overlayHeight: parseInt($overlayHeight.value, 10) || 300,
+        overlayHeight: 100,
         subTier1Points: parseInt($subTier1.value, 10) || 1,
         subTier2Points: parseInt($subTier2.value, 10) || 2,
         subTier3Points: parseInt($subTier3.value, 10) || 6,
@@ -246,6 +279,17 @@ $btnCopyUrl.addEventListener('click', async () => {
 });
 
 $btnSave.addEventListener('click', saveSettingsToStorage);
+
+if ($goalLabel) $goalLabel.addEventListener('input', updatePreviewLive);
+if ($goalTarget) $goalTarget.addEventListener('input', updatePreviewLive);
+if ($subTier1) $subTier1.addEventListener('input', updatePreviewLive);
+if ($subTier2) $subTier2.addEventListener('input', updatePreviewLive);
+if ($subTier3) $subTier3.addEventListener('input', updatePreviewLive);
+if ($overlayWidth) $overlayWidth.addEventListener('input', updatePreviewLive);
+if ($goalStyle) $goalStyle.addEventListener('change', updatePreviewLive);
+if ($hideGiftedOverlay) $hideGiftedOverlay.addEventListener('change', updatePreviewLive);
+if ($hidePrimeOverlay) $hidePrimeOverlay.addEventListener('change', updatePreviewLive);
+if ($hideCommunityOverlay) $hideCommunityOverlay.addEventListener('change', updatePreviewLive);
 
 // ---- test events ----
 $btnTestTier1.addEventListener('click', () => sendTest('1000', false));

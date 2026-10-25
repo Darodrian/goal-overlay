@@ -29,7 +29,7 @@ const DEFAULTS = {
     goalBarColor: '#946ef9',
     goalBarEnabled: true,
     overlayWidth: 600,
-    overlayHeight: 300,
+    overlayHeight: 100,
     subTier1Points: 1,
     subTier2Points: 2,
     subTier3Points: 6,
@@ -153,6 +153,40 @@ function applySize() {
     $goalContainer.style.height = settings.overlayHeight + 'px';
 }
 
+function applyPalette(styleName) {
+    const style = styleName || 'grape';
+    const pal = PALETTES[style] || PALETTES.grape;
+    if (!pal) return;
+    document.documentElement.style.setProperty('--goal-color-1', pal.colors[1] || '#946ef9');
+    document.documentElement.style.setProperty('--goal-color-2', pal.colors[2] || pal.colors[1] || '#7a53f8');
+    document.documentElement.style.setProperty('--goal-color-3', pal.colors[7] || '#c5b5fb');
+    document.documentElement.style.setProperty('--goal-color-border', pal.colors[10] || '#000000');
+    document.documentElement.style.setProperty('--goal-color-track', pal.colors[5] || 'rgba(62, 35, 95, 0.6)');
+    document.documentElement.style.setProperty('--goal-color-bg', pal.colors[5] ? 'rgba(' + parseInt(pal.colors[5].slice(1,3),16) + ', ' + parseInt(pal.colors[5].slice(3,5),16) + ', ' + parseInt(pal.colors[5].slice(5,7),16) + ', 0.35)' : 'rgba(62, 35, 95, 0.35)');
+    document.documentElement.style.setProperty('--goal-color-text', pal.colors[6] || '#c5b5fb');
+    document.documentElement.style.setProperty('--goal-color-text-shadow', pal.colors[10] || '#000000');
+    document.body.dataset.goalStyle = style;
+}
+
+function applyLiveSettings(s) {
+    if (!s) return;
+    settings = { ...settings, ...s };
+    const style = settings.goalStyle || 'grape';
+    const pal = PALETTES[style] || PALETTES.grape;
+    if (!settings.goalBarColor) {
+        settings.goalBarColor = pal.colors[1] || '#946ef9';
+    }
+    if ($goalLabel) $goalLabel.textContent = settings.goalLabel;
+    if ($goalProgress) $goalProgress.textContent = goalCurrentPoints + ' / ' + settings.goalTarget;
+    goalEnabled = settings.goalBarEnabled !== false;
+    const bar = document.querySelector('.goal-bar');
+    if (bar) bar.style.display = goalEnabled ? '' : 'none';
+    document.documentElement.style.setProperty('--goal-color-1', settings.goalBarColor);
+    applyPalette(style);
+    applySize();
+    updateBar();
+}
+
 function initGoal() {
     settings = getSettings(channel, DEFAULTS);
 
@@ -171,7 +205,7 @@ function initGoal() {
     }
 
     document.documentElement.style.setProperty('--goal-color-1', settings.goalBarColor);
-    document.body.dataset.goalStyle = style;
+    applyPalette(style);
     applySize();
     updateBar();
 
@@ -214,19 +248,7 @@ async function connectRoom() {
             if (!validateSession()) return;
             const s = payload && payload.settings;
             if (!s) return;
-            settings = { ...DEFAULTS, ...s };
-            const style = settings.goalStyle || 'grape';
-            const pal = PALETTES[style] || PALETTES.grape;
-            if (!s.goalBarColor && !settings.goalBarColor) {
-                settings.goalBarColor = pal.colors[1] || '#946ef9';
-            }
-            $goalLabel.textContent = settings.goalLabel;
-            goalEnabled = settings.goalBarEnabled !== false;
-            document.querySelector('.goal-bar').style.display = goalEnabled ? '' : 'none';
-            document.documentElement.style.setProperty('--goal-color-1', settings.goalBarColor);
-            document.body.dataset.goalStyle = style;
-            applySize();
-            updateBar();
+            applyLiveSettings(s);
         });
         b.onAddPoints((payload) => {
             if (!validateSession()) return;
@@ -374,6 +396,14 @@ function initComfy() {
         console.error('[overlay] ComfyJS init failed', e);
     }
 }
+
+window.addEventListener('message', (ev) => {
+    try {
+        if (ev.data && ev.data.type === 'goal-preview') {
+            applyLiveSettings(ev.data.settings);
+        }
+    } catch (e) {}
+});
 
 // ---- entry point ----
 channel = normChannel();
