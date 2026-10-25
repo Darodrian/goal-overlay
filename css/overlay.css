@@ -1,0 +1,93 @@
+@font-face {
+    font-family: 'zpix';
+    src: url('../assets/fonts/zpix.woff2') format('woff2');
+    font-weight: 400 700;
+    font-display: swap;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: transparent;
+    font-family: 'zpix', 'Montserrat', sans-serif;
+    font-size: 20px;
+    color: #c5b5fb;
+    text-shadow: 2px 2px 0 #000000;
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: geometricPrecision;
+}
+
+#goal-container {
+    position: relative;
+    width: 600px;
+    height: 300px;
+    box-sizing: border-box;
+}
+
+.goal-bar {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: auto;
+    padding: 16px;
+    margin-bottom: 10px;
+    border-radius: 14px;
+    background-color: rgba(62, 35, 95, 0.35);
+    border: 3px solid #000000;
+    box-sizing: border-box;
+}
+
+.goal-bar .goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.goal-track {
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(62, 35, 95, 0.6);
+    overflow: hidden;
+    border: 2px solid #000000;
+    box-sizing: border-box;
+}
+
+.goal-fill {
+    display: block;
+    height: 100%;
+    width: 0%;
+    transition: width 0.8s ease;
+    background-color: var(--goal-color-1, #946ef9);
+    box-shadow: inset 0 0 6px rgba(255, 255, 255, 0.4);
+}
+
+#setup-notice {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 500;
+    font-family: 'zpix', monospace;
+}
+#setup-notice.show { display: flex; }
+#setup-notice .setup-box {
+    max-width: 480px;
+    margin: 16px;
+    padding: 24px 28px;
+    background: rgba(10, 10, 30, 0.92);
+    border: 4px solid #946ef9;
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.6);
+    color: #c5b5fb;
+    text-align: center;
+}
+#setup-notice h1 { margin: 0 0 16px 0; font-size: 20px; color: #946ef9; }
+#setup-notice p { margin: 0 0 12px 0; font-size: 15px; line-height: 1.6; }
+#setup-notice code { padding: 1px 5px; background: rgba(148, 110, 249, 0.18); border: 1px solid rgba(148, 110, 249, 0.45); color: #c5b5fb; }
