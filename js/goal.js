@@ -1,10 +1,18 @@
 import { createBridge } from './bridge.js';
 import {
-    getSettings, saveSettings,
-    getKey, saveKey, getKeyVersion, hasKey,
-    getPoints, savePoints,
+    getSettings, saveSettings, hasSettings,
+    getKey, syncKeyFromUrl,
+    getPoints, savePoints, generateKey,
     normChannel, overlayKey,
 } from './storage.js';
+import {
+    fetchCloudState,
+    saveCloudSettings,
+    initializeCloudPoints,
+    setCloudPoints,
+    addCloudPoints,
+    resetCloudTestPoints,
+} from './cloud.js';
 
 const PALETTES = {
     default: { name: "Default", colors: ["#efa0d7", "#ec90be", "#e1719b", "#c54e69", "#9c2e34", "#511914", "#f6d1f4", "#e53a79", "#bb2a4a", "#9b2227", "#000000"] },
@@ -36,7 +44,7 @@ const DEFAULTS = {
     hideGiftedInOverlay: false,
     hidePrimeInOverlay: false,
     hideCommunityInOverlay: false,
-    showSpyroIndicator: true,
+    showSpyroIndicator: false,
     goalStyle: 'grape',
     eventsFade: false,
     eventsFadeAfterMs: 10000,
@@ -50,9 +58,14 @@ const DEFAULTS = {
 let channel = '';
 let settings = { ...DEFAULTS };
 let goalCurrentPoints = 0;
-let testPoints = 0;
 let goalEnabled = true;
 let bridge = null;
+let liveSettingsReceived = false;
+let pointsDirty = false;
+let pointsGeneration = 0;
+let pointsAddSeq = 0;
+let pointsQueue = Promise.resolve();
+const embedded = window.parent !== window;
 
 // DOM refs
 const $goalLabel = document.getElementById('goal-label');
@@ -73,6 +86,44 @@ function pointsForTier(tier) {
     return settings.subTier1Points;
 }
 
+function isPointsValue(value) {
+    return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
+}
+
+function normalizePoints(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+}
+
+function queuePoints(task) {
+    pointsQueue = pointsQueue.then(task, task);
+    return pointsQueue;
+}
+
+function resyncCloudPoints() {
+    if (!channel || !key) return;
+    const gen = pointsGeneration;
+    const seq = pointsAddSeq;
+    queuePoints(async () => {
+        try {
+            const state = await fetchCloudState(key);
+            if (gen !== pointsGeneration) return;
+            if (seq !== pointsAddSeq) return;
+            if (state && isPointsValue(state.points)) {
+                goalCurrentPoints = normalizePoints(state.points);
+                savePoints(channel, goalCurrentPoints);
+                updateBar();
+            }
+        } catch (e) {
+            console.warn('[overlay] point resync failed', e?.message ?? e);
+        }
+    });
+}
+
+function overlayUrl(ch, k) {
+    return location.origin + location.pathname + '#c=' + encodeURIComponent(ch) + '&k=' + encodeURIComponent(k);
+}
+
 function tierName(tier) {
     const t = String(tier || '');
     if (t.toLowerCase() === 'prime') return 'Prime';
@@ -83,7 +134,7 @@ function tierName(tier) {
     return t;
 }
 
-function addSubEvent(username, tier, isGifted, isCommunity) {
+function addSubEvent(username, tier, isGifted, isCommunity, isTest = false) {
     if (!$subEvents) return;
 
     const tierStr = String(tier || '');
@@ -107,7 +158,7 @@ function addSubEvent(username, tier, isGifted, isCommunity) {
 
     const pts = pointsForTier(tier);
     const item = document.createElement('div');
-    item.className = 'sub-event';
+    item.className = isTest ? 'sub-event test' : 'sub-event';
     const left = document.createElement('span');
     left.className = 'sub-event-text';
     left.textContent = text;
@@ -251,22 +302,67 @@ function initGoal() {
 
 }
 
+// ---- cloud state (settings + points survive cold starts) ----
+async function syncFromCloud() {
+    if (!channel || !key) return;
+    try {
+        let state = await fetchCloudState(key);
+        if (!state) state = { settings: null, points: null, test_points: 0 };
+
+        if (!state.settings || Object.keys(state.settings).length === 0) {
+            if (!embedded && hasSettings(channel)) {
+                try {
+                    await saveCloudSettings(key, settings);
+                } catch (e) {
+                    console.warn('[overlay] cloud settings seed failed', e?.message ?? e);
+                }
+            }
+        } else if (!liveSettingsReceived) {
+            applyLiveSettings(state.settings);
+            saveSettings(channel, settings);
+        }
+
+        if (state.points == null) {
+            // A point update is already in flight; let its RPC initialize the row.
+            if (!embedded && !pointsDirty) {
+                const seeded = await initializeCloudPoints(key, goalCurrentPoints);
+                if (!pointsDirty && isPointsValue(seeded)) {
+                    pointsGeneration++;
+                    goalCurrentPoints = normalizePoints(seeded);
+                    savePoints(channel, goalCurrentPoints);
+                    updateBar();
+                }
+            }
+        } else if (!pointsDirty && isPointsValue(state.points)) {
+            pointsGeneration++;
+            goalCurrentPoints = normalizePoints(state.points);
+            savePoints(channel, goalCurrentPoints);
+            updateBar();
+        }
+    } catch (e) {
+        console.warn('[overlay] cloud state unavailable, using local data', e?.message ?? e);
+    }
+}
+
 // ---- supabase room (overlay <- dashboard) ----
 async function connectRoom() {
     if (!channel || !key) return;
+    syncFromCloud();
     try {
         const b = createBridge(key);
         b.onStatus((s) => {
             if (s === 'CHANNEL_ERROR') {
                 $setupNotice.classList.add('show');
-                $obsUrl.textContent = location.origin + location.pathname + '?c=' + channel + '&k=' + getKey(channel);
+                $obsUrl.textContent = overlayUrl(channel, getKey(channel));
             }
         });
         b.onSet((payload) => {
             if (!validateSession()) return;
             const s = payload && payload.settings;
             if (!s) return;
+            liveSettingsReceived = true;
             applyLiveSettings(s);
+            saveSettings(channel, settings);
         });
         b.onAddPoints((payload) => {
             if (!validateSession()) return;
@@ -275,43 +371,45 @@ async function connectRoom() {
             const isPrime = isPrimeSub({ 'sub-plan': tier }) || String(tier).toLowerCase() === 'prime';
             const displayTier = isPrime ? 'Prime' : tier;
             if (isGifted && settings.hideGiftedInOverlay) {
-                addSubEvent(payload.username || 'Viewer', displayTier, isGifted, false);
+                addSubEvent(payload.username || 'Viewer', displayTier, isGifted, false, true);
                 return;
             }
             if (isPrime && !isGifted && settings.hidePrimeInOverlay) {
-                addSubEvent(payload.username || 'Viewer', displayTier, isGifted, false);
+                addSubEvent(payload.username || 'Viewer', displayTier, isGifted, false, true);
                 return;
             }
-            // test events from dashboard add points
-            addPoints(displayTier);
-            testPoints += pointsForTier(tier);
-            addSubEvent(payload.username || 'Viewer', displayTier, isGifted, false);
+            addPoints(displayTier, payload.eventId, true);
+            addSubEvent(payload.username || 'Viewer', displayTier, isGifted, false, true);
         });
-        b.onResetPoints((payload) => {
+        b.onResetPoints(async (payload) => {
             if (!validateSession()) return;
-            // Remove only test-event points from the goal; real sub points stay
-            goalCurrentPoints = Math.max(0, goalCurrentPoints - testPoints);
+            const gen = ++pointsGeneration;
+            pointsDirty = true;
+            if (payload && isPointsValue(payload.points)) {
+                goalCurrentPoints = normalizePoints(payload.points);
+            } else if (key) {
+                try {
+                    const next = await resetCloudTestPoints(key);
+                    if (gen === pointsGeneration && isPointsValue(next)) goalCurrentPoints = normalizePoints(next);
+                } catch (e) {
+                    console.warn('[overlay] test point reset failed', e?.message ?? e);
+                }
+            }
             savePoints(channel, goalCurrentPoints);
             updateBar();
             positionSpyroIndicator();
-            // reset only test events from history
-            testPoints = 0;
-            if ($subEvents) {
-                const items = Array.from($subEvents.querySelectorAll('.sub-event'));
-                for (const it of items) {
-                    const t = it.textContent || '';
-                    if (t.startsWith('TestUser') || t.includes('Test')) {
-                        it.remove();
-                    }
-                }
-            }
+            clearTestEvents();
+            resyncCloudPoints();
         });
         b.onSetPoints((payload) => {
             if (!validateSession()) return;
-            if (payload && typeof payload.points === 'number') {
-                goalCurrentPoints = Math.max(0, Math.floor(payload.points));
+            if (payload && isPointsValue(payload.points)) {
+                pointsGeneration++;
+                pointsDirty = true;
+                goalCurrentPoints = normalizePoints(payload.points);
                 savePoints(channel, goalCurrentPoints);
                 updateBar();
+                resyncCloudPoints();
             }
         });
         b.onKeyChanged((payload) => {
@@ -326,16 +424,57 @@ async function connectRoom() {
     }
 }
 
-function addPoints(tier) {
-    goalCurrentPoints += pointsForTier(tier);
-    savePoints(channel, goalCurrentPoints);
-    updateBar();
+function clearTestEvents() {
+    if (!$subEvents) return;
+    const items = Array.from($subEvents.querySelectorAll('.sub-event.test'));
+    for (const it of items) it.remove();
 }
 
-function resetGoalPoints() {
+async function addPoints(tier, eventId, isTest = false) {
+    const delta = Math.max(0, Math.floor(Number(pointsForTier(tier)) || 0));
+    const base = normalizePoints(goalCurrentPoints);
+    const gen = pointsGeneration;
+    pointsDirty = true;
+    goalCurrentPoints = base + delta;
+    savePoints(channel, goalCurrentPoints);
+    updateBar();
+    if (!key) return;
+    const seq = ++pointsAddSeq;
+    const event = eventId || generateKey(16);
+    return queuePoints(async () => {
+        try {
+            const state = await addCloudPoints(key, event, delta, isTest, base);
+            if (gen !== pointsGeneration) return;
+            if (seq !== pointsAddSeq) return;
+            if (!isPointsValue(state?.points)) return;
+            goalCurrentPoints = normalizePoints(state.points);
+            savePoints(channel, goalCurrentPoints);
+            updateBar();
+        } catch (e) {
+            console.warn('[overlay] point sync failed, kept locally', e?.message ?? e);
+        }
+    });
+}
+
+async function resetGoalPoints() {
+    const gen = ++pointsGeneration;
+    pointsDirty = true;
     goalCurrentPoints = 0;
     savePoints(channel, goalCurrentPoints);
     updateBar();
+    if (!key) return;
+    return queuePoints(async () => {
+        try {
+            const next = await setCloudPoints(key, 0);
+            if (gen !== pointsGeneration) return;
+            if (!isPointsValue(next)) return;
+            goalCurrentPoints = normalizePoints(next);
+            savePoints(channel, goalCurrentPoints);
+            updateBar();
+        } catch (e) {
+            console.warn('[overlay] reset sync failed, kept locally', e?.message ?? e);
+        }
+    });
 }
 
 // ---- session validation ----
@@ -362,7 +501,7 @@ function disconnectOverlay(reason) {
         }
     } catch (e) {}
     $setupNotice.classList.add('show');
-    $obsUrl.textContent = location.origin + location.pathname + '?c=' + channel + '&k=' + getKey(channel);
+    $obsUrl.textContent = overlayUrl(channel, getKey(channel));
     console.log('Goal Overlay session invalid: ' + reason);
 }
 
@@ -399,7 +538,7 @@ function reinitComfy(newChannel) {
     }
 }
 
-function handleSubscriber(actor, tier, isGifted, isCommunity) {
+function handleSubscriber(actor, tier, isGifted, isCommunity, eventId) {
     const tierStr = String(tier || '');
     const isPrime = isPrimeSub({ 'sub-plan': tier }) || tierStr.toLowerCase() === 'prime' || tierStr === 'Prime';
     const displayTier = isPrime ? 'Prime' : tier;
@@ -416,7 +555,7 @@ function handleSubscriber(actor, tier, isGifted, isCommunity) {
         addSubEvent(actor, displayTier, isGifted, isCommunity);
         return;
     }
-    addPoints(displayTier);
+    addPoints(displayTier, eventId);
     addSubEvent(actor, displayTier, isGifted, isCommunity);
 }
 
@@ -465,7 +604,7 @@ function initComfy() {
         const tier = tierFromInfo(subTierInfo);
         const displayName = displayNameFromInfo(user, subTierInfo, undefined);
         const actor = actorFromInfo(user, subTierInfo, undefined, false);
-        handleSubscriber(actor, tier, false, false);
+        handleSubscriber(actor, tier, false, false, extra?.id);
     };
 
     // onSubGift: gifted subscription
@@ -476,7 +615,7 @@ function initComfy() {
         const tier = tierFromInfo(subTierInfo);
         const displayName = displayNameFromInfo(undefined, subTierInfo, gifterUser);
         const actor = actorFromInfo(undefined, subTierInfo, gifterUser, false);
-        handleSubscriber(actor, tier, true, false);
+        handleSubscriber(actor, tier, true, false, extra?.id);
     };
 
     // onResub: subscription renewal
@@ -486,7 +625,7 @@ function initComfy() {
         const tier = tierFromInfo(subTierInfo);
         const displayName = displayNameFromInfo(user, subTierInfo, undefined);
         const actor = actorFromInfo(user, subTierInfo, undefined, false);
-        handleSubscriber(actor, tier, false, false);
+        handleSubscriber(actor, tier, false, false, extra?.id);
     };
 
     // onSubMysteryGift: mystery/community gift subscription
@@ -496,7 +635,7 @@ function initComfy() {
         const tier = tierFromInfo(subTierInfo);
         const displayName = displayNameFromInfo(undefined, subTierInfo, gifterUser);
         const actor = actorFromInfo(undefined, subTierInfo, gifterUser, true);
-        handleSubscriber(actor, tier, true, true);
+        handleSubscriber(actor, tier, true, true, extra?.id);
     };
 
     // onGiftSubContinue: continuing a gifted sub
@@ -508,7 +647,7 @@ function initComfy() {
         const tier = '1000';
         const displayName = displayNameFromInfo(undefined, undefined, sender);
         const actor = actorFromInfo(undefined, undefined, sender, false);
-        handleSubscriber(actor, tier, true, false);
+        handleSubscriber(actor, tier, true, false, extra?.id);
     };
 
     // Community sub gifts in ComfyJS come through onSubGift or onSubMysteryGift;
@@ -546,7 +685,10 @@ function positionSpyroIndicator() {
 
 window.addEventListener('message', (ev) => {
     try {
+        if (ev.origin !== location.origin) return;
+        if (ev.source !== window.parent && ev.source !== window) return;
         if (ev.data && ev.data.type === 'goal-preview') {
+            liveSettingsReceived = true;
             applyLiveSettings(ev.data.settings);
         }
     } catch (e) {}
@@ -558,7 +700,7 @@ const key = overlayKey();
 
 if (!channel) {
     $setupNotice.classList.add('show');
-    $obsUrl.textContent = location.origin + location.pathname + '?c=yourchannel&k=yourkey';
+    $obsUrl.textContent = overlayUrl('yourchannel', 'yourkey');
     // still init with defaults for preview
     settings = { ...DEFAULTS };
     initGoal();
@@ -566,18 +708,15 @@ if (!channel) {
     // Use URL key as source of truth (critical for OBS Browser Source where localStorage may differ)
     const storedKey = getKey(channel);
     if (key) {
-        if (storedKey !== key) {
-            saveKey(channel, key);
-            // also update key version to match
-        }
+        syncKeyFromUrl(channel, key, !embedded);
         initGoal();
         initComfy();
     } else if (storedKey) {
         $setupNotice.classList.add('show');
-        $obsUrl.textContent = location.origin + location.pathname + '?c=' + channel + '&k=' + storedKey;
+        $obsUrl.textContent = overlayUrl(channel, storedKey);
     } else {
         $setupNotice.classList.add('show');
-        $obsUrl.textContent = location.origin + location.pathname + '?c=yourchannel&k=yourkey';
+        $obsUrl.textContent = overlayUrl('yourchannel', 'yourkey');
         settings = { ...DEFAULTS };
         initGoal();
     }

@@ -41,6 +41,10 @@ export function saveSettings(channel, settings) {
     storageSet(storageKey(channel, 'settings'), JSON.stringify(settings));
 }
 
+export function hasSettings(channel) {
+    return storageGet(storageKey(channel, 'settings'), null) !== null;
+}
+
 // ---- secret key per channel ----
 export function getKey(channel) {
     return storageGet(storageKey(channel, 'key'), '');
@@ -50,6 +54,12 @@ export function saveKey(channel, key) {
 }
 export function hasKey(channel) {
     return getKey(channel).length > 0;
+}
+export function syncKeyFromUrl(channel, urlKey, persist = true) {
+    if (!channel || !urlKey || !persist) return false;
+    if (getKey(channel) === urlKey) return false;
+    saveKey(channel, urlKey);
+    return true;
 }
 
 // ---- key version (session) per channel ----

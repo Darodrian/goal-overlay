@@ -1,9 +1,16 @@
 import {
-    getSettings, saveSettings,
+    getSettings, saveSettings, hasSettings,
     getKey, saveKey, saveKeyVersion, getKeyVersion, hasKey, generateKey,
     norm,
 } from './storage.js';
 import { createBridge } from './bridge.js';
+import {
+    fetchCloudState,
+    saveCloudSettings,
+    initializeCloudPoints,
+    setCloudPoints,
+    resetCloudTestPoints,
+} from './cloud.js';
 
 const PALETTES = {
     default: { name: "Default", colors: ["#efa0d7", "#ec90be", "#e1719b", "#c54e69", "#9c2e34", "#511914", "#f6d1f4", "#e53a79", "#bb2a4a", "#9b2227", "#000000"] },
@@ -34,7 +41,7 @@ const DEFAULTS = {
     hideGiftedInOverlay: false,
     hidePrimeInOverlay: false,
     hideCommunityInOverlay: false,
-    showSpyroIndicator: true,
+    showSpyroIndicator: false,
     goalStyle: 'grape',
     eventsFade: false,
     eventsFadeAfterMs: 10000,
@@ -159,25 +166,57 @@ function updatePreviewLive() {
     }
 }
 
-function loadSettingsFor(ch) {
-    settings = getSettings(ch, { ...DEFAULTS });
-    $goalLabel.value = settings.goalLabel;
-    $goalTarget.value = settings.goalTarget;
-    $subTier1.value = settings.subTier1Points;
-    $subTier2.value = settings.subTier2Points;
-    $subTier3.value = settings.subTier3Points;
-    $hideGiftedOverlay.checked = settings.hideGiftedInOverlay === true;
-    $hidePrimeOverlay.checked = settings.hidePrimeInOverlay === true;
-    $hideCommunityOverlay.checked = settings.hideCommunityInOverlay === true;
-    if ($showSpyroIndicator) $showSpyroIndicator.checked = settings.showSpyroIndicator === true;
-    if ($goalStyle) $goalStyle.value = settings.goalStyle || 'grape';
-    $overlayWidth.value = settings.overlayWidth;
-    if ($eventsFade) $eventsFade.checked = settings.eventsFade === true;
-    if ($eventsFadeMs) $eventsFadeMs.value = settings.eventsFadeAfterMs || 10000;
+function applySettingsToForm(s) {
+    $goalLabel.value = s.goalLabel;
+    $goalTarget.value = s.goalTarget;
+    $subTier1.value = s.subTier1Points;
+    $subTier2.value = s.subTier2Points;
+    $subTier3.value = s.subTier3Points;
+    $hideGiftedOverlay.checked = s.hideGiftedInOverlay === true;
+    $hidePrimeOverlay.checked = s.hidePrimeInOverlay === true;
+    $hideCommunityOverlay.checked = s.hideCommunityInOverlay === true;
+    if ($showSpyroIndicator) $showSpyroIndicator.checked = s.showSpyroIndicator === true;
+    if ($goalStyle) $goalStyle.value = s.goalStyle || 'grape';
+    $overlayWidth.value = s.overlayWidth;
+    if ($eventsFade) $eventsFade.checked = s.eventsFade === true;
+    if ($eventsFadeMs) $eventsFadeMs.value = s.eventsFadeAfterMs || 10000;
     updatePreviewLive();
 }
 
-function saveSettingsToStorage() {
+async function loadSettingsFor(ch) {
+    const local = getSettings(ch, { ...DEFAULTS });
+    let cloud = null;
+    let cloudFailed = false;
+
+    if (key) {
+        try {
+            cloud = await fetchCloudState(key);
+        } catch (e) {
+            cloudFailed = true;
+            console.warn('[dashboard] cloud settings unavailable', e?.message ?? e);
+            flash('Cloud unavailable; using local settings', 'err');
+        }
+    }
+
+    if (cloud && cloud.settings && Object.keys(cloud.settings).length > 0) {
+        settings = { ...local, ...cloud.settings };
+        saveSettings(ch, settings);
+    } else {
+        settings = local;
+        if (key && !cloudFailed && hasSettings(ch)) {
+            try {
+                await saveCloudSettings(key, settings);
+            } catch (e) {
+                console.warn('[dashboard] cloud settings save failed', e?.message ?? e);
+                flash('Settings saved locally; cloud save failed', 'err');
+            }
+        }
+    }
+
+    applySettingsToForm(settings);
+}
+
+async function saveSettingsToStorage() {
     if (!channel) { flash('Enter your channel first'); return; }
     const style = $goalStyle ? $goalStyle.value : 'grape';
     const pal = PALETTES[style] || PALETTES.grape;
@@ -205,7 +244,19 @@ function saveSettingsToStorage() {
     if (bridge && bridge.isConnected()) {
         bridge.sendSet({ settings: s });
     }
-    flash('Settings saved for ' + channel);
+
+    if (!key) {
+        flash('Settings saved locally. Generate a key to sync.');
+        return;
+    }
+
+    try {
+        await saveCloudSettings(key, s);
+        flash('Settings saved for ' + channel);
+    } catch (e) {
+        console.warn('[dashboard] cloud settings save failed', e?.message ?? e);
+        flash('Settings saved locally; cloud save failed', 'err');
+    }
 }
 
 // ---- supabase room (dashboard <-> overlay) ----
@@ -261,10 +312,11 @@ $channel.addEventListener('change', () => {
 $btnKey.addEventListener('click', async () => {
     const ch = norm($channel.value.trim());
     if (!ch) { flash('Enter your channel first'); return; }
+    const prevKey = getKey(ch);
     channel = ch;
     const had = hasKey(channel);
     if (had) {
-        if (!confirm('Generate a new key? The old overlay URL will stop working until you paste the new one in OBS.')) return;
+        if (!confirm('Generate a new key? The old overlay URL will keep using its old saved settings and points until you paste the new URL in OBS.')) return;
     }
     key = generateKey();
     saveKey(channel, key);
@@ -275,6 +327,25 @@ $btnKey.addEventListener('click', async () => {
     sessionStorage.setItem('key-generated', had ? 'New key generated and URL copied. Update OBS.' : 'Key generated and URL copied. Paste in OBS.');
     localStorage.setItem('goal_overlay_last_channel', channel);
     await copyText(buildOverlayUrl(channel, key));
+    if (prevKey) {
+        setOverlay('busy', 'Copying saved room data...');
+        try {
+            const oldState = await fetchCloudState(prevKey);
+            if (oldState) {
+                if (oldState.settings && Object.keys(oldState.settings).length > 0) {
+                    await saveCloudSettings(key, oldState.settings).catch((e) => {
+                        console.warn('[dashboard] could not carry settings to new key', e?.message ?? e);
+                    });
+                }
+                if (oldState.points != null) {
+                    const real = Math.max(0, Math.floor(Number(oldState.points) || 0) - Math.floor(Number(oldState.test_points) || 0));
+                    await initializeCloudPoints(key, real);
+                }
+            }
+        } catch (e) {
+            console.warn('[dashboard] could not carry room data to new key', e?.message ?? e);
+        }
+    }
     location.reload();
 });
 
@@ -287,14 +358,21 @@ $btnCopyUrl.addEventListener('click', async () => {
 $btnSave.addEventListener('click', saveSettingsToStorage);
 
 if ($btnSetPoints) {
-    $btnSetPoints.addEventListener('click', () => {
+    $btnSetPoints.addEventListener('click', async () => {
         if (!channel) { flash('Enter your channel first'); return; }
+        if (!key) { flash('Generate a key first'); return; }
         const pts = Math.max(0, parseInt($manualPoints && $manualPoints.value, 10) || 0);
-        if (bridge && bridge.isConnected()) {
-            bridge.send('setPoints', { points: pts });
-            flash('Points set to ' + pts);
-        } else {
-            flash('Overlay not connected to room');
+        try {
+            const next = await setCloudPoints(key, pts);
+            if (bridge && bridge.isConnected()) {
+                bridge.send('setPoints', { points: next });
+                flash('Points set to ' + next);
+            } else {
+                flash('Points saved to cloud. Overlay will sync on next load.');
+            }
+        } catch (e) {
+            console.warn('[dashboard] set points failed', e?.message ?? e);
+            flash('Could not save points to cloud', 'err');
         }
     });
 }
@@ -325,26 +403,34 @@ function sendTest(tier, isGifted) {
     if (!channel) { flash('Enter your channel first'); return; }
     const username = $testUsername.value.trim() || 'Viewer';
     if (bridge && bridge.isConnected()) {
-        bridge.sendAddPoints({ tier, username, isGifted });
+        bridge.sendAddPoints({ tier, username, isGifted, eventId: generateKey(16) });
         flash('Test: ' + (isGifted ? 'Gifted ' : '') + 'Tier ' + tier + ' sub by ' + username);
     } else {
         flash('Overlay not connected to room');
     }
 }
 
-function sendTestReset() {
+async function sendTestReset() {
     if (!channel) { flash('Enter your channel first'); return; }
-    if (bridge && bridge.isConnected()) {
-        bridge.sendResetPoints({ type: 'test' });
-        flash('Test events cleared from history');
-    } else {
-        flash('Overlay not connected to room');
+    if (!key) { flash('Generate a key first'); return; }
+    try {
+        const next = await resetCloudTestPoints(key);
+        if (bridge && bridge.isConnected()) {
+            bridge.sendResetPoints({ type: 'test', points: next });
+            flash('Test events cleared from history');
+        } else {
+            flash('Test points cleared. Overlay will sync on next load.');
+        }
+    } catch (e) {
+        console.warn('[dashboard] reset test points failed', e?.message ?? e);
+        flash('Could not reset test points in cloud', 'err');
     }
 }
 
 // ---- init ----
-const savedChannel = localStorage.getItem('goal_overlay_last_channel');
-if (savedChannel) {
+async function init() {
+    const savedChannel = localStorage.getItem('goal_overlay_last_channel');
+    if (!savedChannel) return;
     $channel.value = savedChannel;
     channel = norm(savedChannel);
     key = getKey(channel);
@@ -353,10 +439,12 @@ if (savedChannel) {
     // Show one-shot flash from key-generation reload, then clear it.
     const pending = sessionStorage.getItem('key-generated');
     if (pending) { flash(pending); sessionStorage.removeItem('key-generated'); }
-    loadSettingsFor(channel);
+    await loadSettingsFor(channel);
     startRoom();
     updatePreview();
 }
+
+init();
 
 window.addEventListener('beforeunload', () => {
     if (channel) localStorage.setItem('goal_overlay_last_channel', channel);
