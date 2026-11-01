@@ -42,8 +42,6 @@ const DEFAULTS = {
 const $goalLabel = document.getElementById('goal-label');
 const $goalStyle = document.getElementById('goal-style');
 const $overlayWidth = document.getElementById('overlay-width');
-const $eventsFade = document.getElementById('events-fade');
-const $eventsFadeMs = document.getElementById('events-fade-ms');
 const $btnConnect = document.getElementById('btn-connect');
 const $btnCopyUrl = document.getElementById('btn-copy-url');
 const $btnSave = document.getElementById('btn-save');
@@ -121,8 +119,6 @@ function buildLivePreviewSettings() {
         overlayWidth: parseInt($overlayWidth ? $overlayWidth.value : 600, 10) || 600,
         overlayHeight: 100,
         goalStyle: style,
-        eventsFade: $eventsFade ? $eventsFade.checked : (settings.eventsFade === true),
-        eventsFadeAfterMs: $eventsFadeMs ? (parseInt($eventsFadeMs.value, 10) || 10000) : (settings.eventsFadeAfterMs || 10000),
         selected_goal_id: settings.selected_goal_id || '',
     };
 }
@@ -143,8 +139,6 @@ function applySettingsToForm(s) {
     if ($goalLabel) $goalLabel.value = s.goalLabel || '';
     if ($goalStyle) $goalStyle.value = s.goalStyle || 'grape';
     if ($overlayWidth) $overlayWidth.value = s.overlayWidth || 600;
-    if ($eventsFade) $eventsFade.checked = s.eventsFade === true;
-    if ($eventsFadeMs) $eventsFadeMs.value = s.eventsFadeAfterMs || 10000;
     updatePreviewLive();
 }
 
@@ -244,8 +238,6 @@ async function saveSettingsToStorage() {
         overlayWidth: parseInt($overlayWidth ? $overlayWidth.value : 600, 10) || 600,
         overlayHeight: 100,
         goalStyle: style,
-        eventsFade: $eventsFade ? $eventsFade.checked : false,
-        eventsFadeAfterMs: $eventsFadeMs ? (parseInt($eventsFadeMs.value, 10) || 10000) : 10000,
         selected_goal_id: settings.selected_goal_id || '',
     };
     saveSettings(broadcasterId, s);
@@ -332,8 +324,6 @@ if ($btnSave) {
 if ($goalLabel) $goalLabel.addEventListener('input', updatePreviewLive);
 if ($goalStyle) $goalStyle.addEventListener('change', updatePreviewLive);
 if ($overlayWidth) $overlayWidth.addEventListener('input', updatePreviewLive);
-if ($eventsFade) $eventsFade.addEventListener('change', updatePreviewLive);
-if ($eventsFadeMs) $eventsFadeMs.addEventListener('input', updatePreviewLive);
 
 // ---- init ----
 async function init() {

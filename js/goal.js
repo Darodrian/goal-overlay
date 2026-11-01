@@ -28,8 +28,6 @@ const DEFAULTS = {
     overlayWidth: 600,
     overlayHeight: 100,
     goalStyle: 'grape',
-    eventsFade: false,
-    eventsFadeAfterMs: 10000,
 };
 
 let broadcasterId = '';
@@ -166,13 +164,9 @@ function handleGoalProgress(event, info) {
         }
     }
 
-    if (settings.eventsFade === true) {
-        const fadeAfter = Math.max(1000, parseInt(settings.eventsFadeAfterMs, 10) || 10000);
-        setTimeout(() => {
-            item.style.opacity = '0';
-            setTimeout(() => { if (item.parentNode) item.remove(); }, 500);
-        }, fadeAfter);
-    }
+    setTimeout(() => {
+        if (item.parentNode) item.remove();
+    }, 5000);
 }
 
 // ---- supabase room (overlay <- dashboard settings) ----

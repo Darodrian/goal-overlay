@@ -21,7 +21,7 @@
     <div id="connection-panel" class="panel">
       <h2 id="connection-title">Connect Twitch</h2>
       <button type="button" id="btn-connect">Connect Twitch account</button>
-      <div id="connection-connected" hidden style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);">
+      <div id="connection-connected" hidden>
         <span id="connection-status">Connected</span>
         <button type="button" id="btn-copy-url" disabled>Copy overlay URL</button>
       </div>
@@ -58,12 +58,6 @@
       <label class="field">Overlay width (px)
         <input id="overlay-width" type="number" min="200" max="1920" step="10" value="600">
       </label>
-      <div class="row seg">
-        <label class="field"><input id="events-fade" type="checkbox"> Fade out goal-change events</label>
-        <label class="field">Fade after (ms)
-          <input id="events-fade-ms" type="number" min="1000" step="500" value="10000">
-        </label>
-      </div>
       <button type="button" id="btn-save">Save settings</button>
     </div>
   </div>
