@@ -83,6 +83,7 @@ function showConnected(connected) {
     if ($connectionTitle) $connectionTitle.textContent = connected ? 'Connected' : 'Connect Twitch';
     if ($btnConnect) $btnConnect.hidden = connected;
     if ($connectionConnected) $connectionConnected.hidden = !connected;
+    if ($btnCopyUrl) $btnCopyUrl.disabled = !connected;
     if ($connectionStatus) {
         $connectionStatus.textContent = connected ? ('Connected: ' + broadcasterLogin) : '';
     }
