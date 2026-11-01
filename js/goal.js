@@ -1,18 +1,7 @@
 import { createBridge } from './bridge.js';
-import {
-    getSettings, saveSettings, hasSettings,
-    getKey, syncKeyFromUrl,
-    getPoints, savePoints, generateKey,
-    normChannel, overlayKey,
-} from './storage.js';
-import {
-    fetchCloudState,
-    saveCloudSettings,
-    initializeCloudPoints,
-    setCloudPoints,
-    addCloudPoints,
-    resetCloudTestPoints,
-} from './cloud.js';
+import { getSettings, saveSettings, broadcasterId as getBroadcasterId } from './storage.js';
+import { fetchCloudState, saveCloudState } from './cloud.js';
+import { getAccessToken, fetchGoals, EventSubClient } from './twitch.js';
 
 const PALETTES = {
     default: { name: "Default", colors: ["#efa0d7", "#ec90be", "#e1719b", "#c54e69", "#9c2e34", "#511914", "#f6d1f4", "#e53a79", "#bb2a4a", "#9b2227", "#000000"] },
@@ -32,39 +21,27 @@ const PALETTES = {
 };
 
 const DEFAULTS = {
-    goalLabel: 'Meta Partner Plus 2',
-    goalTarget: 200,
+    goalLabel: '',
+    goalTarget: 100,
     goalBarColor: '#946ef9',
     goalBarEnabled: true,
     overlayWidth: 600,
     overlayHeight: 100,
-    subTier1Points: 1,
-    subTier2Points: 2,
-    subTier3Points: 6,
-    hideGiftedInOverlay: false,
-    hidePrimeInOverlay: false,
-    hideCommunityInOverlay: false,
-    showSpyroIndicator: false,
     goalStyle: 'grape',
     eventsFade: false,
     eventsFadeAfterMs: 10000,
-    goalDataSource: 'persist',
-    startingPoints: 0,
-    goalManualPoints: 0,
-    fontColor: '#c5b5fb',
-    backgroundColor: 'rgba(62, 35, 95, 0.35)',
 };
 
-let channel = '';
+let broadcasterId = '';
 let settings = { ...DEFAULTS };
-let goalCurrentPoints = 0;
+let goalCurrentAmount = 0;
+let goalTargetAmount = 100;
+let goalDescription = '';
+let goalType = '';
 let goalEnabled = true;
 let bridge = null;
-let liveSettingsReceived = false;
+let eventSub = null;
 let pointsDirty = false;
-let pointsGeneration = 0;
-let pointsAddSeq = 0;
-let pointsQueue = Promise.resolve();
 const embedded = window.parent !== window;
 
 // DOM refs
@@ -76,16 +53,6 @@ const $subEvents = document.getElementById('sub-events');
 const $setupNotice = document.getElementById('setup-notice');
 const $obsUrl = document.getElementById('obs-url');
 
-function pointsForTier(tier) {
-    const t = String(tier || '').toLowerCase();
-    if (t === 'prime') return settings.subTier1Points;
-    if (t === '3000' || t === '3' || t.includes('3000')) return settings.subTier3Points;
-    if (t === '2000' || t === '2' || t.includes('2000')) return settings.subTier2Points;
-    if (t === '1000' || t === '1' || t.includes('1000')) return settings.subTier1Points;
-    // default to tier 1
-    return settings.subTier1Points;
-}
-
 function isPointsValue(value) {
     return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
 }
@@ -95,128 +62,17 @@ function normalizePoints(value) {
     return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
 }
 
-function queuePoints(task) {
-    pointsQueue = pointsQueue.then(task, task);
-    return pointsQueue;
-}
-
-function resyncCloudPoints() {
-    if (!channel || !key) return;
-    const gen = pointsGeneration;
-    const seq = pointsAddSeq;
-    queuePoints(async () => {
-        try {
-            const state = await fetchCloudState(key);
-            if (gen !== pointsGeneration) return;
-            if (seq !== pointsAddSeq) return;
-            if (state && isPointsValue(state.points)) {
-                goalCurrentPoints = normalizePoints(state.points);
-                savePoints(channel, goalCurrentPoints);
-                updateBar();
-            }
-        } catch (e) {
-            console.warn('[overlay] point resync failed', e?.message ?? e);
-        }
-    });
-}
-
-function overlayUrl(ch, k) {
-    return location.origin + location.pathname + '#c=' + encodeURIComponent(ch) + '&k=' + encodeURIComponent(k);
-}
-
-function tierName(tier) {
-    const t = String(tier || '');
-    if (t.toLowerCase() === 'prime') return 'Prime';
-    if (t === '3000' || t === '3' || t.includes('3000')) return 'Tier 3';
-    if (t === '2000' || t === '2' || t.includes('2000')) return 'Tier 2';
-    if (t === '1000' || t === '1' || t.includes('1000')) return 'Tier 1';
-    if (t === 'Prime') return 'Prime';
-    return t;
-}
-
-function addSubEvent(username, tier, isGifted, isCommunity, isTest = false) {
-    if (!$subEvents) return;
-
-    const tierStr = String(tier || '');
-    const isPrime = isPrimeSub({ 'sub-plan': tier }) || tierStr.toLowerCase() === 'prime' || tierStr === 'Prime';
-    if (isCommunity && settings.hideCommunityInOverlay) return;
-    if (isGifted && !isCommunity && settings.hideGiftedInOverlay) return;
-    if (isPrime && !isGifted && !isCommunity && settings.hidePrimeInOverlay) return;
-
-    const name = tierName(tier);
-    const actor = (username && username !== 'null' && username !== 'undefined' && username !== '') ? username : (isCommunity ? 'Community' : 'Someone');
-    let text;
-    if (isCommunity) {
-        text = actor + ' gifted ' + name + ' sub (community)';
-    } else if (isGifted) {
-        text = actor + ' gifted ' + name + ' sub';
-    } else if (isPrime) {
-        text = actor + ' subscribed with Prime';
-    } else {
-        text = actor + ' subscribed ' + name;
-    }
-
-    const pts = pointsForTier(tier);
-    const item = document.createElement('div');
-    item.className = isTest ? 'sub-event test' : 'sub-event';
-    const left = document.createElement('span');
-    left.className = 'sub-event-text';
-    left.textContent = text;
-    const right = document.createElement('span');
-    right.className = 'sub-event-points';
-    right.textContent = '+' + pts;
-    item.appendChild(left);
-    item.appendChild(right);
-
-    $subEvents.insertBefore(item, $subEvents.firstChild);
-
-    while ($subEvents.children.length > 20) {
-        $subEvents.removeChild($subEvents.lastChild);
-    }
-
-    if (settings.eventsFade === true) {
-        const fadeAfter = Math.max(1000, parseInt(settings.eventsFadeAfterMs, 10) || 10000);
-        setTimeout(() => {
-            item.style.opacity = '0';
-            setTimeout(() => { if (item.parentNode) item.remove(); }, 500);
-        }, fadeAfter);
-    }
-}
-
-function isPrimeSub(userstate) {
-    if (!userstate) return false;
-    const plan = userstate['sub-plan'] || userstate['msg-param-sub-plan'] || userstate.plan || userstate['subPlan'] || userstate['sub_plan'];
-    if (!plan) return false;
-    if (plan === 'Prime') return true;
-    const s = String(plan).toLowerCase();
-    if (s === 'prime') return true;
-    if (s === '1000' && (userstate['isPrime'] === true || userstate.prime === true)) return true;
-    return false;
-}
-
-function isCommunityGift(event, userstate) {
-    return event.communityGift === true ||
-           event.isCommunityGift === true ||
-           event.giftType === 'community' ||
-           event.isCommunity === true ||
-           event.community_gift === true ||
-           (userstate && (userstate['msg-param-gifted'] === 'community' || userstate['msg-param-promogift'] === '1'));
-}
-
-function isGiftedSub(event, userstate) {
-    const gifted = event.gifted === true || event.amount === 'gift' ||
-                   (userstate && (userstate['msg-param-gifted'] === '1' || userstate['msg-param-gifted'] === true));
-    return gifted && !isCommunityGift(event, userstate);
+function overlayUrl(broadcasterId) {
+    return location.origin + location.pathname + '?broadcaster_id=' + encodeURIComponent(broadcasterId);
 }
 
 function updateBar() {
-    const pct = settings.goalTarget > 0
-        ? Math.min(goalCurrentPoints / settings.goalTarget, 1) * 100
+    const pct = goalTargetAmount > 0
+        ? Math.min(goalCurrentAmount / goalTargetAmount, 1) * 100
         : 0;
     $goalFill.style.width = pct + '%';
-    $goalProgress.textContent = goalCurrentPoints + ' / ' + settings.goalTarget;
+    $goalProgress.textContent = goalCurrentAmount + ' / ' + goalTargetAmount;
     document.documentElement.style.setProperty('--goal-color-1', settings.goalBarColor);
-    positionSpyroIndicator();
 }
 
 function applySize() {
@@ -251,8 +107,12 @@ function applyLiveSettings(s) {
     if (!settings.goalBarColor) {
         settings.goalBarColor = pal.colors[1] || '#946ef9';
     }
-    if ($goalLabel) $goalLabel.textContent = settings.goalLabel;
-    if ($goalProgress) $goalProgress.textContent = goalCurrentPoints + ' / ' + settings.goalTarget;
+    if ($goalLabel && goalDescription) {
+        $goalLabel.textContent = settings.goalLabel || goalDescription;
+    }
+    if ($goalProgress) {
+        $goalProgress.textContent = goalCurrentAmount + ' / ' + goalTargetAmount;
+    }
     goalEnabled = settings.goalBarEnabled !== false;
     const bar = document.querySelector('.goal-bar');
     if (bar) bar.style.display = goalEnabled ? '' : 'none';
@@ -262,8 +122,155 @@ function applyLiveSettings(s) {
     updateBar();
 }
 
+function renderGoal(goal) {
+    if (!goal) return;
+    goalDescription = goal.description || '';
+    goalType = goal.type || '';
+    goalTargetAmount = normalizePoints(goal.target_amount) || 100;
+    goalCurrentAmount = normalizePoints(goal.current_amount) || 0;
+
+    if ($goalLabel) {
+        $goalLabel.textContent = settings.goalLabel || goalDescription;
+    }
+    if ($goalProgress) {
+        $goalProgress.textContent = goalCurrentAmount + ' / ' + goalTargetAmount;
+    }
+    updateBar();
+}
+
+function handleGoalProgress(event, info) {
+    if (info && info.revoked) {
+        console.warn('[overlay] eventsub revoked');
+        return;
+    }
+    if (!event) return;
+
+    const current = normalizePoints(event.current_amount);
+    const target = normalizePoints(event.target_amount);
+    if (current === goalCurrentAmount && target === goalTargetAmount) return;
+
+    goalCurrentAmount = current;
+    goalTargetAmount = target;
+    updateBar();
+
+    // Fade-out style flash on change
+    const item = document.createElement('div');
+    item.className = 'sub-event';
+    const text = document.createElement('span');
+    text.className = 'sub-event-text';
+    text.textContent = 'Goal updated: ' + current + ' / ' + target;
+    const pts = document.createElement('span');
+    pts.className = 'sub-event-points';
+    pts.textContent = '';
+    item.appendChild(text);
+    item.appendChild(pts);
+    if ($subEvents) {
+        $subEvents.insertBefore(item, $subEvents.firstChild);
+        while ($subEvents.children.length > 20) {
+            $subEvents.removeChild($subEvents.lastChild);
+        }
+    }
+
+    if (settings.eventsFade === true) {
+        const fadeAfter = Math.max(1000, parseInt(settings.eventsFadeAfterMs, 10) || 10000);
+        setTimeout(() => {
+            item.style.opacity = '0';
+            setTimeout(() => { if (item.parentNode) item.remove(); }, 500);
+        }, fadeAfter);
+    }
+}
+
+// ---- supabase room (overlay <- dashboard settings) ----
+async function connectRoom() {
+    if (!broadcasterId) return;
+
+    try {
+        const state = await fetchCloudState(broadcasterId);
+        if (state) {
+            if (state.selected_goal_id) {
+                settings.selected_goal_id = state.selected_goal_id;
+            }
+            if (state.settings && Object.keys(state.settings).length > 0) {
+                applyLiveSettings(state.settings);
+                saveSettings(broadcasterId, settings);
+            }
+        }
+    } catch (e) {
+        console.warn('[overlay] cloud state unavailable, using defaults', e?.message ?? e);
+    }
+
+    try {
+        const b = createBridge(broadcasterId);
+        b.onSet((payload) => {
+            const s = payload && payload.settings;
+            if (!s) return;
+            applyLiveSettings(s);
+            saveSettings(broadcasterId, settings);
+        });
+        b.onKeyChanged((payload) => {
+            disconnectOverlay('Key changed.');
+        });
+        await b.connect();
+        bridge = b;
+        b.sendHello();
+    } catch (e) {
+        bridge = null;
+        console.warn('[overlay] room unavailable, continuing without live settings', e?.message ?? e);
+    }
+}
+
+function disconnectOverlay(reason) {
+    try {
+        if (bridge) { bridge.leave(); bridge = null; }
+    } catch (e) {}
+    if (eventSub) {
+        eventSub.disconnect();
+        eventSub = null;
+    }
+    $setupNotice.classList.add('show');
+    $obsUrl.textContent = overlayUrl(broadcasterId);
+    console.log('Goal Overlay session invalid: ' + reason);
+}
+
+async function startEventSub() {
+    if (!broadcasterId) return;
+    try {
+        const token = await getAccessToken(broadcasterId);
+        eventSub = new EventSubClient(broadcasterId, handleGoalProgress);
+        eventSub.connect(token);
+    } catch (e) {
+        console.warn('[overlay] eventsub start failed', e?.message ?? e);
+        // Still render from the REST fetch below
+    }
+}
+
+async function loadGoalsFromTwitch() {
+    if (!broadcasterId) return;
+    try {
+        const token = await getAccessToken(broadcasterId);
+        const goals = await fetchGoals(broadcasterId, token);
+        // Find the selected goal from cloud state, or use the first active one
+        let selected = null;
+        if (settings.selected_goal_id) {
+            selected = goals.find(g => g.id === settings.selected_goal_id);
+        }
+        if (!selected && goals.length > 0) {
+            selected = goals[0];
+        }
+        if (selected) {
+            renderGoal(selected);
+            settings.selected_goal_id = selected.id;
+            saveSettings(broadcasterId, settings);
+        } else {
+            console.warn('[overlay] no active goals found for broadcaster', broadcasterId);
+        }
+    } catch (e) {
+        console.warn('[overlay] goals load failed', e?.message ?? e);
+    }
+}
+
 function initGoal() {
-    settings = getSettings(channel, DEFAULTS);
+    settings = getSettings(broadcasterId, { ...DEFAULTS });
 
     const style = settings.goalStyle || 'grape';
     const pal = PALETTES[style] || PALETTES.grape;
@@ -271,8 +278,8 @@ function initGoal() {
         settings.goalBarColor = pal.colors[1] || '#946ef9';
     }
 
-    $goalLabel.textContent = settings.goalLabel;
-    $goalProgress.textContent = '0 / ' + settings.goalTarget;
+    if ($goalLabel) $goalLabel.textContent = settings.goalLabel || '';
+    if ($goalProgress) $goalProgress.textContent = '0 / ' + settings.goalTarget;
 
     goalEnabled = settings.goalBarEnabled !== false;
     if (!goalEnabled) {
@@ -284,444 +291,22 @@ function initGoal() {
     applySize();
     updateBar();
 
-    const manual = parseInt(settings.goalManualPoints, 10) || 0;
-    if (manual > 0) {
-        goalCurrentPoints = manual;
-    } else if (settings.goalDataSource === 'reset') {
-        goalCurrentPoints = 0;
-    } else if (settings.goalDataSource === 'manual') {
-        goalCurrentPoints = parseInt(settings.startingPoints, 10) || 0;
-    } else {
-        // persist
-        goalCurrentPoints = getPoints(channel);
-    }
-    savePoints(channel, goalCurrentPoints);
-    updateBar();
-
     connectRoom();
-
+    startEventSub();
+    loadGoalsFromTwitch();
 }
-
-// ---- cloud state (settings + points survive cold starts) ----
-async function syncFromCloud() {
-    if (!channel || !key) return;
-    try {
-        let state = await fetchCloudState(key);
-        if (!state) state = { settings: null, points: null, test_points: 0 };
-
-        if (!state.settings || Object.keys(state.settings).length === 0) {
-            if (!embedded && hasSettings(channel)) {
-                try {
-                    await saveCloudSettings(key, settings);
-                } catch (e) {
-                    console.warn('[overlay] cloud settings seed failed', e?.message ?? e);
-                }
-            }
-        } else if (!liveSettingsReceived) {
-            applyLiveSettings(state.settings);
-            saveSettings(channel, settings);
-        }
-
-        if (state.points == null) {
-            // A point update is already in flight; let its RPC initialize the row.
-            if (!embedded && !pointsDirty) {
-                const seeded = await initializeCloudPoints(key, goalCurrentPoints);
-                if (!pointsDirty && isPointsValue(seeded)) {
-                    pointsGeneration++;
-                    goalCurrentPoints = normalizePoints(seeded);
-                    savePoints(channel, goalCurrentPoints);
-                    updateBar();
-                }
-            }
-        } else if (!pointsDirty && isPointsValue(state.points)) {
-            pointsGeneration++;
-            goalCurrentPoints = normalizePoints(state.points);
-            savePoints(channel, goalCurrentPoints);
-            updateBar();
-        }
-    } catch (e) {
-        console.warn('[overlay] cloud state unavailable, using local data', e?.message ?? e);
-    }
-}
-
-// ---- supabase room (overlay <- dashboard) ----
-async function connectRoom() {
-    if (!channel || !key) return;
-    syncFromCloud();
-    try {
-        const b = createBridge(key);
-        b.onStatus((s) => {
-            if (s === 'CHANNEL_ERROR') {
-                $setupNotice.classList.add('show');
-                $obsUrl.textContent = overlayUrl(channel, getKey(channel));
-            }
-        });
-        b.onSet((payload) => {
-            if (!validateSession()) return;
-            const s = payload && payload.settings;
-            if (!s) return;
-            liveSettingsReceived = true;
-            applyLiveSettings(s);
-            saveSettings(channel, settings);
-        });
-        b.onAddPoints((payload) => {
-            if (!validateSession()) return;
-            const isGifted = payload.isGifted === true;
-            const tier = payload.tier || '1000';
-            const isPrime = isPrimeSub({ 'sub-plan': tier }) || String(tier).toLowerCase() === 'prime';
-            const displayTier = isPrime ? 'Prime' : tier;
-            if (isGifted && settings.hideGiftedInOverlay) {
-                addSubEvent(payload.username || 'Viewer', displayTier, isGifted, false, true);
-                return;
-            }
-            if (isPrime && !isGifted && settings.hidePrimeInOverlay) {
-                addSubEvent(payload.username || 'Viewer', displayTier, isGifted, false, true);
-                return;
-            }
-            addPoints(displayTier, payload.eventId, true);
-            addSubEvent(payload.username || 'Viewer', displayTier, isGifted, false, true);
-        });
-        b.onResetPoints(async (payload) => {
-            if (!validateSession()) return;
-            const gen = ++pointsGeneration;
-            pointsDirty = true;
-            if (payload && isPointsValue(payload.points)) {
-                goalCurrentPoints = normalizePoints(payload.points);
-            } else if (key) {
-                try {
-                    const next = await resetCloudTestPoints(key);
-                    if (gen === pointsGeneration && isPointsValue(next)) goalCurrentPoints = normalizePoints(next);
-                } catch (e) {
-                    console.warn('[overlay] test point reset failed', e?.message ?? e);
-                }
-            }
-            savePoints(channel, goalCurrentPoints);
-            updateBar();
-            positionSpyroIndicator();
-            clearTestEvents();
-            resyncCloudPoints();
-        });
-        b.onSetPoints((payload) => {
-            if (!validateSession()) return;
-            if (payload && isPointsValue(payload.points)) {
-                pointsGeneration++;
-                pointsDirty = true;
-                goalCurrentPoints = normalizePoints(payload.points);
-                savePoints(channel, goalCurrentPoints);
-                updateBar();
-                resyncCloudPoints();
-            }
-        });
-        b.onKeyChanged((payload) => {
-            disconnectOverlay('Key regenerated by dashboard.');
-        });
-        await b.connect();
-        bridge = b;
-        b.sendHello();
-    } catch (e) {
-        bridge = null;
-        console.warn('[overlay] room unavailable, continuing without live updates', e?.message ?? e);
-    }
-}
-
-function clearTestEvents() {
-    if (!$subEvents) return;
-    const items = Array.from($subEvents.querySelectorAll('.sub-event.test'));
-    for (const it of items) it.remove();
-}
-
-async function addPoints(tier, eventId, isTest = false) {
-    const delta = Math.max(0, Math.floor(Number(pointsForTier(tier)) || 0));
-    const base = normalizePoints(goalCurrentPoints);
-    const gen = pointsGeneration;
-    pointsDirty = true;
-    goalCurrentPoints = base + delta;
-    savePoints(channel, goalCurrentPoints);
-    updateBar();
-    if (!key) return;
-    const seq = ++pointsAddSeq;
-    const event = eventId || generateKey(16);
-    return queuePoints(async () => {
-        try {
-            const state = await addCloudPoints(key, event, delta, isTest, base);
-            if (gen !== pointsGeneration) return;
-            if (seq !== pointsAddSeq) return;
-            if (!isPointsValue(state?.points)) return;
-            goalCurrentPoints = normalizePoints(state.points);
-            savePoints(channel, goalCurrentPoints);
-            updateBar();
-        } catch (e) {
-            console.warn('[overlay] point sync failed, kept locally', e?.message ?? e);
-        }
-    });
-}
-
-async function resetGoalPoints() {
-    const gen = ++pointsGeneration;
-    pointsDirty = true;
-    goalCurrentPoints = 0;
-    savePoints(channel, goalCurrentPoints);
-    updateBar();
-    if (!key) return;
-    return queuePoints(async () => {
-        try {
-            const next = await setCloudPoints(key, 0);
-            if (gen !== pointsGeneration) return;
-            if (!isPointsValue(next)) return;
-            goalCurrentPoints = normalizePoints(next);
-            savePoints(channel, goalCurrentPoints);
-            updateBar();
-        } catch (e) {
-            console.warn('[overlay] reset sync failed, kept locally', e?.message ?? e);
-        }
-    });
-}
-
-// ---- session validation ----
-// Ensures the overlay's key/version still matches what the dashboard has
-// stored. If the dashboard generated a new key, this overlay's session is
-// invalid and it must disconnect. Runs on BroadcastChannel messages and via
-// polling so OBS (which doesn't receive BroadcastChannel from the dashboard)
-// also gets invalidated.
-function validateSession() {
-    if (!channel || !key) {
-        disconnectOverlay('Missing key.');
-        return false;
-    }
-    return true;
-}
-
-function disconnectOverlay(reason) {
-    try {
-        if (bridge) { bridge.leave(); bridge = null; }
-    } catch (e) {}
-    try {
-        if (window.ComfyJS && window.ComfyJS.Disconnect) {
-            window.ComfyJS.Disconnect();
-        }
-    } catch (e) {}
-    $setupNotice.classList.add('show');
-    $obsUrl.textContent = overlayUrl(channel, getKey(channel));
-    console.log('Goal Overlay session invalid: ' + reason);
-}
-
-function reinitComfy(newChannel) {
-    // Disconnect old ComfyJS session
-    try {
-        if (window.ComfyJS && window.ComfyJS.Disconnect) {
-            window.ComfyJS.Disconnect();
-        }
-    } catch (e) {
-        console.error('[overlay] Failed to disconnect ComfyJS', e);
-    }
-    // Clear event history for the new channel
-    if ($subEvents) {
-        // Remove existing sub-event items
-        const items = Array.from($subEvents.querySelectorAll('.sub-event'));
-        for (const it of items) {
-            const t = it.textContent || '';
-            // Only remove test events from history; keep regular events
-            // But since we're switching channels, clear all for this overlay
-            it.remove();
-        }
-        // Reset the max displayed events counter
-        while ($subEvents.children.length > 0) {
-            $subEvents.removeChild($subEvents.firstChild);
-        }
-    }
-    // Update the channel variable and reinitialize
-    channel = typeof newChannel !== 'undefined' ? newChannel : normChannel();
-    try {
-        initComfy();
-    } catch (e) {
-        console.error('[overlay] Failed to reinitialize ComfyJS', e);
-    }
-}
-
-function handleSubscriber(actor, tier, isGifted, isCommunity, eventId) {
-    const tierStr = String(tier || '');
-    const isPrime = isPrimeSub({ 'sub-plan': tier }) || tierStr.toLowerCase() === 'prime' || tierStr === 'Prime';
-    const displayTier = isPrime ? 'Prime' : tier;
-    // If hidden in overlay, don't count for goal
-    if (isCommunity && settings.hideCommunityInOverlay) {
-        addSubEvent(actor, displayTier, isGifted, isCommunity);
-        return;
-    }
-    if (isGifted && !isCommunity && settings.hideGiftedInOverlay) {
-        addSubEvent(actor, displayTier, isGifted, isCommunity);
-        return;
-    }
-    if (isPrime && !isGifted && !isCommunity && settings.hidePrimeInOverlay) {
-        addSubEvent(actor, displayTier, isGifted, isCommunity);
-        return;
-    }
-    addPoints(displayTier, eventId);
-    addSubEvent(actor, displayTier, isGifted, isCommunity);
-}
-
-function tierFromInfo(info) {
-    if (!info) return '1000';
-    if (info.prime) return 'Prime';
-    return info.plan || '1000';
-}
-
-function isPrimeFromInfo(info) {
-    if (!info) return false;
-    return info.prime === true || String(info.plan || '').toLowerCase() === 'prime';
-}
-
-function displayNameFromInfo(username, userstate, sender) {
-    if (sender && sender !== 'null' && sender !== 'undefined') return sender;
-    if (username && username !== 'null' && username !== 'undefined') return username;
-    if (userstate) {
-        const dn = userstate['display-name'] || userstate.displayName || userstate['login'] || '';
-        if (dn) return dn;
-    }
-    return '';
-}
-
-function actorFromInfo(username, userstate, sender, isCommunity) {
-    if (isCommunity) return 'Community';
-    if (sender && sender !== 'null' && sender !== 'undefined') return sender;
-    if (username && username !== 'null' && username !== 'undefined') return username;
-    if (userstate) {
-        const un = userstate['login'] || userstate['display-name'] || userstate.displayName || '';
-        if (un) return un;
-    }
-    return '';
-}
-
-function initComfy() {
-    if (!window.ComfyJS) {
-        console.error('Goal Overlay: ComfyJS not loaded');
-        return;
-    }
-
-    // onSub: new (non-resub, non-gift) subscription
-    // ComfyJS 1.1.29 signature: onSub(user, message, subTierInfo, extra)
-    //   subTierInfo = { prime, plan, planName } from tmi.js methods object
-    window.ComfyJS.onSub = (user, message, subTierInfo, extra) => {
-        const tier = tierFromInfo(subTierInfo);
-        const displayName = displayNameFromInfo(user, subTierInfo, undefined);
-        const actor = actorFromInfo(user, subTierInfo, undefined, false);
-        handleSubscriber(actor, tier, false, false, extra?.id);
-    };
-
-    // onSubGift: gifted subscription
-    // ComfyJS 1.1.29 signature: onSubGift(gifterUser, streakMonths, recipientUser, senderCount, subTierInfo, extra)
-    //   subTierInfo = { prime, plan, planName }
-    // Note: old code had (channelName, username, sender, userstate, methods) — wrong arg order
-    window.ComfyJS.onSubGift = (gifterUser, streakMonths, recipientUser, senderCount, subTierInfo, extra) => {
-        const tier = tierFromInfo(subTierInfo);
-        const displayName = displayNameFromInfo(undefined, subTierInfo, gifterUser);
-        const actor = actorFromInfo(undefined, subTierInfo, gifterUser, false);
-        handleSubscriber(actor, tier, true, false, extra?.id);
-    };
-
-    // onResub: subscription renewal
-    // ComfyJS 1.1.29 signature: onResub(user, message, streakMonths, cumulativeMonths, subTierInfo, extra)
-    //   subTierInfo = { prime, plan, planName }
-    window.ComfyJS.onResub = (user, message, streakMonths, cumulativeMonths, subTierInfo, extra) => {
-        const tier = tierFromInfo(subTierInfo);
-        const displayName = displayNameFromInfo(user, subTierInfo, undefined);
-        const actor = actorFromInfo(user, subTierInfo, undefined, false);
-        handleSubscriber(actor, tier, false, false, extra?.id);
-    };
-
-    // onSubMysteryGift: mystery/community gift subscription
-    // ComfyJS 1.1.29 signature: onSubMysteryGift(gifterUser, numbOfSubs, senderCount, subTierInfo, extra)
-    //   subTierInfo = { prime, plan, planName }
-    window.ComfyJS.onSubMysteryGift = (gifterUser, numbOfSubs, senderCount, subTierInfo, extra) => {
-        const tier = tierFromInfo(subTierInfo);
-        const displayName = displayNameFromInfo(undefined, subTierInfo, gifterUser);
-        const actor = actorFromInfo(undefined, subTierInfo, gifterUser, true);
-        handleSubscriber(actor, tier, true, true, extra?.id);
-    };
-
-    // onGiftSubContinue: continuing a gifted sub
-    // ComfyJS 1.1.29 signature: onGiftSubContinue(username, sender, extra)
-    //   username = recipient login, sender = gifter name (may be null if anonymous),
-    //   extra = { gifterUsername, gifterDisplayName } — ComfyJS does not forward
-    //   sub-plan info, so we default to Tier 1 (the old code also always fell back to '1000').
-    window.ComfyJS.onGiftSubContinue = (username, sender, extra) => {
-        const tier = '1000';
-        const displayName = displayNameFromInfo(undefined, undefined, sender);
-        const actor = actorFromInfo(undefined, undefined, sender, false);
-        handleSubscriber(actor, tier, true, false, extra?.id);
-    };
-
-    // Community sub gifts in ComfyJS come through onSubGift or onSubMysteryGift;
-    // there is no standalone onCommunitySubGift event. The old handler is removed.
-
-    // Prime upgrades/paid upgrades come through onPrimePaidUpgrade in old code
-    // but ComfyJS does not emit that event. Prime subs come through onSub/onResub
-    // with subTierInfo.prime = true, so no separate handler needed.
-
-    try {
-        window.ComfyJS.Init(channel);
-    } catch (e) {
-        console.error('[overlay] ComfyJS init failed', e);
-    }
-}
-
-function positionSpyroIndicator() {
-    if (!settings.showSpyroIndicator) {
-        const indicator = document.querySelector('.spyro-indicator');
-        if (indicator) indicator.style.display = 'none';
-        return;
-    }
-    const indicator = document.querySelector('.spyro-indicator');
-    if (!indicator) return;
-    indicator.style.display = 'block';
-    const pct = settings.goalTarget > 0
-        ? Math.min(goalCurrentPoints / settings.goalTarget, 1)
-        : 0;
-    // Spyro sits at the bottom ledge of the track
-    // Moves horizontally as the goal fills
-    indicator.style.left = `${pct * 100}%`;
-    indicator.style.top = 'auto';
-    indicator.style.bottom = '0';
-}
-
-window.addEventListener('message', (ev) => {
-    try {
-        if (ev.origin !== location.origin) return;
-        if (ev.source !== window.parent && ev.source !== window) return;
-        if (ev.data && ev.data.type === 'goal-preview') {
-            liveSettingsReceived = true;
-            applyLiveSettings(ev.data.settings);
-        }
-    } catch (e) {}
-});
 
 // ---- entry point ----
-channel = normChannel();
-const key = overlayKey();
+broadcasterId = getBroadcasterId();
 
-if (!channel) {
+if (!broadcasterId) {
     $setupNotice.classList.add('show');
-    $obsUrl.textContent = overlayUrl('yourchannel', 'yourkey');
-    // still init with defaults for preview
+    $obsUrl.textContent = overlayUrl('your-broadcaster-id');
     settings = { ...DEFAULTS };
     initGoal();
 } else {
-    // Use URL key as source of truth (critical for OBS Browser Source where localStorage may differ)
-    const storedKey = getKey(channel);
-    if (key) {
-        syncKeyFromUrl(channel, key, !embedded);
-        initGoal();
-        initComfy();
-    } else if (storedKey) {
-        $setupNotice.classList.add('show');
-        $obsUrl.textContent = overlayUrl(channel, storedKey);
-    } else {
-        $setupNotice.classList.add('show');
-        $obsUrl.textContent = overlayUrl('yourchannel', 'yourkey');
-        settings = { ...DEFAULTS };
-        initGoal();
-    }
+    initGoal();
 }
 
-window.addPoints = addPoints;
-window.resetGoalPoints = resetGoalPoints;
-window.reinitComfy = reinitComfy;
+window.addPoints = () => {};
+window.resetGoalPoints = () => {};

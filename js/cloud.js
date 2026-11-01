@@ -40,32 +40,14 @@ async function rpc(name, body) {
     }
 }
 
-export function fetchCloudState(room) {
-    return rpc('goal_overlay_get', { p_room: room });
+export function fetchCloudState(broadcasterId) {
+    return rpc('goal_overlay_get', { p_broadcaster_id: broadcasterId });
 }
 
-export function saveCloudSettings(room, settings) {
-    return rpc('goal_overlay_save', { p_room: room, p_settings: settings });
-}
-
-export function initializeCloudPoints(room, points) {
-    return rpc('goal_overlay_initialize_points', { p_room: room, p_points: points });
-}
-
-export function setCloudPoints(room, points) {
-    return rpc('goal_overlay_set_points', { p_room: room, p_points: points });
-}
-
-export function addCloudPoints(room, eventId, delta, isTest, initialPoints = null) {
-    return rpc('goal_overlay_add_points', {
-        p_room: room,
-        p_event_id: eventId,
-        p_delta: delta,
-        p_is_test: isTest === true,
-        p_initial_points: initialPoints,
+export function saveCloudState(broadcasterId, selectedGoalId, settings) {
+    return rpc('goal_overlay_save', {
+        p_broadcaster_id: broadcasterId,
+        p_selected_goal_id: selectedGoalId,
+        p_settings: settings,
     });
-}
-
-export function resetCloudTestPoints(room) {
-    return rpc('goal_overlay_reset_test_points', { p_room: room });
 }

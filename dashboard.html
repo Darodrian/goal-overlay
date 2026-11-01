@@ -18,23 +18,31 @@
       <div class="msg" id="msg" hidden></div>
     </div>
 
-    <div class="panel">
-      <h2>Channel</h2>
+    <div id="connect-section" class="panel">
+      <h2>Connect Twitch</h2>
       <label class="field">Twitch channel name
         <input id="channel" spellcheck="false" placeholder="yourchannel">
       </label>
-      <div class="keybar">
-        <span>Secret key: <em class="none" id="key-none">not generated</em><code id="key-val" hidden></code></span>
-        <button type="button" id="btn-copy-url" disabled>Copy overlay URL</button>
-        <button type="button" id="btn-key">Generate key</button>
-      </div>
-      <p class="note">Paste the overlay URL into OBS as a Browser Source. Only someone with the key can control this overlay.</p>
+      <button type="button" id="btn-connect">Connect Twitch account</button>
+      <p class="note">You'll be asked to authorize the app to read your channel's goals. This only needs to happen once; the overlay keeps running after you close the dashboard.</p>
     </div>
 
-    <div class="panel">
+    <div id="connected-badge" hidden class="panel" style="background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.4);">
+      <h2>Connected</h2>
+      <span id="connected-badge-text">Not connected</span>
+      <button type="button" id="btn-copy-url" disabled>Copy overlay URL</button>
+    </div>
+
+    <div id="goals-section" hidden class="panel">
+      <h2>Active goals</h2>
+      <div id="goals-list"></div>
+      <p class="note">Select the goal to display on the overlay.</p>
+    </div>
+
+    <div id="settings-section" hidden class="panel">
       <h2>Goal settings</h2>
-      <label class="field">Caption text
-        <input id="goal-label" type="text" value="Meta Partner Plus 2">
+      <label class="field">Caption override (blank = use goal description from Twitch)
+        <input id="goal-label" type="text" placeholder="e.g. Road to Partner Plus">
       </label>
       <label class="field">Style palette
         <select id="goal-style">
@@ -57,36 +65,12 @@
       <label class="field">Overlay width (px)
         <input id="overlay-width" type="number" min="200" max="1920" step="10" value="600">
       </label>
-      <label class="field">Target (points)
-        <input id="goal-target" type="number" min="1" step="1" value="200">
-      </label>
-      <label class="field">Points — Tier 1
-        <input id="sub-tier1" type="number" min="0" step="1" value="1">
-      </label>
-      <label class="field">Points — Tier 2
-        <input id="sub-tier2" type="number" min="0" step="1" value="2">
-      </label>
-      <label class="field">Points — Tier 3
-        <input id="sub-tier3" type="number" min="0" step="1" value="6">
-      </label>
       <div class="row seg">
-        <label class="field"><input id="hide-gifted-overlay" type="checkbox"> Hide gifted subs in overlay</label>
-        <label class="field"><input id="hide-prime-overlay" type="checkbox"> Hide Prime subs in overlay</label>
-        <label class="field"><input id="hide-community-overlay" type="checkbox"> Hide community gifts in overlay</label>
-      </div>
-      <div class="row seg">
-        <label class="field"><input id="show-spyro-indicator" type="checkbox"> Show Spyro indicator on goal bar</label>
-      </div>
-      <div class="row seg">
-        <label class="field"><input id="events-fade" type="checkbox"> Fade out events</label>
+        <label class="field"><input id="events-fade" type="checkbox"> Fade out goal-change events</label>
         <label class="field">Fade after (ms)
           <input id="events-fade-ms" type="number" min="1000" step="500" value="10000">
         </label>
       </div>
-      <label class="field">Current points (override)
-        <input id="manual-points" type="number" min="0" step="1" value="0">
-      </label>
-      <button type="button" id="btn-set-points">Set current points</button>
       <button type="button" id="btn-save">Save settings</button>
     </div>
   </div>
@@ -95,24 +79,7 @@
     <div class="panel panel-preview">
       <h2>Preview</h2>
       <div id="preview-shell"><iframe id="preview" title="Goal overlay preview" hidden></iframe></div>
-      <p class="note" id="preview-note">Generate a key to preview the overlay that goes into OBS.</p>
-    </div>
-
-    <div class="panel panel-test">
-      <h2>Test events</h2>
-      <label class="field">Username
-        <input id="test-username" type="text" placeholder="Viewer" value="TestUser">
-      </label>
-      <div class="test-row">
-        <button type="button" id="btn-test-tier1">Tier 1 sub</button>
-        <button type="button" id="btn-test-tier2">Tier 2 sub</button>
-        <button type="button" id="btn-test-tier3">Tier 3 sub</button>
-      </div>
-      <div class="test-row">
-        <button type="button" id="btn-test-gift1">Gifted Tier 1</button>
-        <button type="button" id="btn-test-gift2">Gifted Tier 2</button>
-      </div>
-      <button type="button" id="btn-test-reset">Clean Test Events</button>
+      <p class="note" id="preview-note">Connect your Twitch account to preview the overlay that goes into OBS.</p>
     </div>
   </div>
 </div>

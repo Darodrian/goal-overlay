@@ -1,35 +1,39 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getKey, saveKey, syncKeyFromUrl } from '../js/storage.js';
+import { norm, broadcasterId } from '../js/storage.js';
 
-function useFakeStorage() {
-    const data = new Map();
-    globalThis.localStorage = {
-        getItem: (key) => (data.has(key) ? data.get(key) : null),
-        setItem: (key, value) => { data.set(key, String(value)); },
-        removeItem: (key) => { data.delete(key); },
-    };
-}
+test('norm lowercases and trims the channel name', () => {
+    assert.equal(norm('  MyChannel  '), 'mychannel');
+    assert.equal(norm(''), '');
+});
 
-test('a top-level overlay adopts the key from its URL', () => {
-    useFakeStorage();
+test('broadcasterId reads from URL search param', () => {
+    const origLocation = globalThis.location;
     try {
-        saveKey('chan', 'old');
-        syncKeyFromUrl('chan', 'new', true);
-        assert.equal(getKey('chan'), 'new');
+        globalThis.location = new URL('https://example.com/index.html?broadcaster_id=12345678');
+        assert.equal(broadcasterId(), '12345678');
     } finally {
-        delete globalThis.localStorage;
+        globalThis.location = origLocation;
     }
 });
 
-test('an embedded preview does not overwrite the dashboard key', () => {
-    useFakeStorage();
+test('broadcasterId reads from URL hash param', () => {
+    const origLocation = globalThis.location;
     try {
-        saveKey('chan', 'new');
-        syncKeyFromUrl('chan', 'old', false);
-        assert.equal(getKey('chan'), 'new');
+        globalThis.location = new URL('https://example.com/index.html#broadcaster_id=87654321');
+        assert.equal(broadcasterId(), '87654321');
     } finally {
-        delete globalThis.localStorage;
+        globalThis.location = origLocation;
+    }
+});
+
+test('broadcasterId returns empty string when no param', () => {
+    const origLocation = globalThis.location;
+    try {
+        globalThis.location = new URL('https://example.com/index.html');
+        assert.equal(broadcasterId(), '');
+    } finally {
+        globalThis.location = origLocation;
     }
 });
