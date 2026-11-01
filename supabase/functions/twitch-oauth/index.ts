@@ -58,22 +58,17 @@ serve(async (req) => {
     };
 
     try {
-        // ---- GET /authorize?login=channelname ----
+        // ---- GET /twitch-oauth/authorize ----
         if (path === "/twitch-oauth/authorize" && req.method === "GET") {
-            const login = url.searchParams.get("login");
-            if (!login) {
-                return json({ error: "missing login" }, 400);
-            }
-
+            // Twitch authorizes the currently logged-in user; broadcaster_id is resolved
+            // from the access token via GET /helix/users. State is just CSRF protection.
             const state = crypto.randomUUID();
-            // Store state in a short-lived cookie-like manner via Supabase? Simpler: we trust state == broadcaster login
-            // but we still validate state on callback against the 'login' param passed back.
             const params = new URLSearchParams({
                 client_id: TWITCH_CLIENT_ID,
                 redirect_uri: `${BASE_URL}/callback`,
                 response_type: "code",
                 scope: "channel:read:goals",
-                state: login,
+                state: state,
             });
 
             return redirect(`${TWITCH_AUTHORIZE}?${params.toString()}`);

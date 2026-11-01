@@ -1,6 +1,5 @@
 import {
-    getSettings, saveSettings, hasSettings,
-    broadcasterId as getBroadcasterIdFromUrl,
+    getSettings, saveSettings,
 } from './storage.js';
 import { createBridge } from './bridge.js';
 import {
@@ -40,7 +39,6 @@ const DEFAULTS = {
 };
 
 // DOM refs
-const $channel = document.getElementById('channel');
 const $goalLabel = document.getElementById('goal-label');
 const $goalStyle = document.getElementById('goal-style');
 const $overlayWidth = document.getElementById('overlay-width');
@@ -62,7 +60,6 @@ const $goalsSection = document.getElementById('goals-section');
 const $settingsSection = document.getElementById('settings-section');
 const $connectedBadge = document.getElementById('connected-badge');
 
-let channel = '';
 let broadcasterId = '';
 let broadcasterLogin = '';
 let settings = { ...DEFAULTS };
@@ -315,13 +312,7 @@ function copyText(text) {
 // ---- OAuth connect ----
 if ($btnConnect) {
     $btnConnect.addEventListener('click', () => {
-        const login = $channel ? $channel.value.trim() : '';
-        if (!login) { flash('Enter your Twitch channel name first'); return; }
-        channel = login;
-        const authUrl = `${TWITCH_OAUTH_BASE}/authorize?login=${encodeURIComponent(login)}`;
-        // Store the channel so we can restore it after the OAuth round-trip
-        localStorage.setItem('goal_overlay_last_channel', channel);
-        localStorage.setItem('goal_overlay_pending_login', channel);
+        const authUrl = `${TWITCH_OAUTH_BASE}/authorize`;
         location.href = authUrl;
     });
 }
@@ -365,9 +356,6 @@ async function init() {
         // Persist so returning users don't need to re-OAuth on every reload
         localStorage.setItem('goal_overlay_broadcaster_id', broadcasterId);
         localStorage.setItem('goal_overlay_broadcaster_login', broadcasterLogin);
-        localStorage.setItem('goal_overlay_last_channel', broadcasterLogin);
-        if ($channel) $channel.value = broadcasterLogin;
-        channel = broadcasterLogin;
         showConnected(true);
         await loadSettingsFor(broadcasterId);
         await loadGoals();
@@ -384,21 +372,7 @@ async function init() {
     if (savedBroadcasterId) {
         broadcasterId = savedBroadcasterId;
         broadcasterLogin = savedBroadcasterLogin || '';
-        if ($channel) $channel.value = broadcasterLogin || '';
-        channel = broadcasterLogin || '';
         showConnected(true);
-    } else {
-        const savedChannel = localStorage.getItem('goal_overlay_last_channel');
-        if (savedChannel && $channel) {
-            $channel.value = savedChannel;
-            channel = savedChannel;
-        }
-    }
-
-    // If we have a pending login from OAuth, try to resume
-    const pendingLogin = localStorage.getItem('goal_overlay_pending_login');
-    if (pendingLogin) {
-        localStorage.removeItem('goal_overlay_pending_login');
     }
 
     if (broadcasterId) {
@@ -412,5 +386,6 @@ async function init() {
 init();
 
 window.addEventListener('beforeunload', () => {
-    if (channel) localStorage.setItem('goal_overlay_last_channel', channel);
+    if (broadcasterId) localStorage.setItem('goal_overlay_broadcaster_id', broadcasterId);
+    if (broadcasterLogin) localStorage.setItem('goal_overlay_broadcaster_login', broadcasterLogin);
 });

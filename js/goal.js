@@ -51,7 +51,6 @@ const $goalFill = document.getElementById('goal-fill');
 const $goalContainer = document.getElementById('goal-container');
 const $subEvents = document.getElementById('sub-events');
 const $setupNotice = document.getElementById('setup-notice');
-const $obsUrl = document.getElementById('obs-url');
 
 function isPointsValue(value) {
     return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
@@ -60,10 +59,6 @@ function isPointsValue(value) {
 function normalizePoints(value) {
     const n = Number(value);
     return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
-}
-
-function overlayUrl(broadcasterId) {
-    return location.origin + location.pathname + '?broadcaster_id=' + encodeURIComponent(broadcasterId);
 }
 
 function updateBar() {
@@ -228,7 +223,6 @@ function disconnectOverlay(reason) {
         eventSub = null;
     }
     $setupNotice.classList.add('show');
-    $obsUrl.textContent = overlayUrl(broadcasterId);
     console.log('Goal Overlay session invalid: ' + reason);
 }
 
@@ -301,7 +295,6 @@ broadcasterId = getBroadcasterId();
 
 if (!broadcasterId) {
     $setupNotice.classList.add('show');
-    $obsUrl.textContent = overlayUrl('your-broadcaster-id');
     settings = { ...DEFAULTS };
     initGoal();
 } else {
