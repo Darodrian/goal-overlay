@@ -47,18 +47,18 @@ const $eventsFadeMs = document.getElementById('events-fade-ms');
 const $btnConnect = document.getElementById('btn-connect');
 const $btnCopyUrl = document.getElementById('btn-copy-url');
 const $btnSave = document.getElementById('btn-save');
-const $keyNone = document.getElementById('key-none');
-const $keyVal = document.getElementById('key-val');
 const $dotOv = document.getElementById('dot-ov');
 const $statusOv = document.getElementById('status-ov');
 const $msg = document.getElementById('msg');
 const $preview = document.getElementById('preview');
 const $previewNote = document.getElementById('preview-note');
 const $goalsList = document.getElementById('goals-list');
-const $connectSection = document.getElementById('connect-section');
+const $connectionPanel = document.getElementById('connection-panel');
+const $connectionTitle = document.getElementById('connection-title');
+const $connectionConnected = document.getElementById('connection-connected');
+const $connectionStatus = document.getElementById('connection-status');
 const $goalsSection = document.getElementById('goals-section');
 const $settingsSection = document.getElementById('settings-section');
-const $connectedBadge = document.getElementById('connected-badge');
 
 let broadcasterId = '';
 let broadcasterLogin = '';
@@ -81,16 +81,15 @@ function setOverlay(kind, text) {
 }
 
 function showConnected(connected) {
-    if ($connectSection) $connectSection.hidden = connected;
+    if ($connectionPanel) $connectionPanel.hidden = false;
+    if ($connectionTitle) $connectionTitle.textContent = connected ? 'Connected' : 'Connect Twitch';
+    if ($btnConnect) $btnConnect.hidden = connected;
+    if ($connectionConnected) $connectionConnected.hidden = !connected;
+    if ($connectionStatus) {
+        $connectionStatus.textContent = connected ? ('Connected: ' + broadcasterLogin) : '';
+    }
     if ($goalsSection) $goalsSection.hidden = !connected;
     if ($settingsSection) $settingsSection.hidden = !connected;
-    if ($connectedBadge) {
-        const $badgeText = document.getElementById('connected-badge-text');
-        if ($badgeText) {
-            $badgeText.textContent = connected ? ('Connected: ' + broadcasterLogin) : 'Not connected';
-        }
-        $connectedBadge.hidden = !connected;
-    }
     setOverlay(connected ? 'live' : '', connected ? ('Channel: ' + broadcasterLogin) : 'No channel');
 }
 

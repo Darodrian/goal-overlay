@@ -18,22 +18,18 @@
       <div class="msg" id="msg" hidden></div>
     </div>
 
-    <div id="connect-section" class="panel">
-      <h2>Connect Twitch</h2>
+    <div id="connection-panel" class="panel">
+      <h2 id="connection-title">Connect Twitch</h2>
       <button type="button" id="btn-connect">Connect Twitch account</button>
-      <p class="note">You'll be asked to authorize the app to read your channel's goals. This only needs to happen once; the overlay keeps running after you close the dashboard.</p>
-    </div>
-
-    <div id="connected-badge" hidden class="panel" style="background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.4);">
-      <h2>Connected</h2>
-      <span id="connected-badge-text">Not connected</span>
-      <button type="button" id="btn-copy-url" disabled>Copy overlay URL</button>
+      <div id="connection-connected" hidden style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);">
+        <span id="connection-status">Connected</span>
+        <button type="button" id="btn-copy-url" disabled>Copy overlay URL</button>
+      </div>
     </div>
 
     <div id="goals-section" hidden class="panel">
       <h2>Active goals</h2>
       <div id="goals-list"></div>
-      <p class="note">Select the goal to display on the overlay.</p>
     </div>
 
     <div id="settings-section" hidden class="panel">
