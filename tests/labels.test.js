@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveGoalLabel } from '../js/labels.js';
+import { resolveGoalLabel, goalTypeLabel } from '../js/labels.js';
 
 test('caption override wins over everything', () => {
     assert.equal(resolveGoalLabel('My caption', 'Follow goal', 'follower'), 'My caption');
@@ -25,4 +25,11 @@ test('goals without a description use a friendly goal type', () => {
 test('unknown or missing goal type with no description resolves to empty', () => {
     assert.equal(resolveGoalLabel('', '', 'mystery_goal'), '');
     assert.equal(resolveGoalLabel('', '', ''), '');
+});
+
+test('goalTypeLabel normalizes Twitch goal types for the dashboard list', () => {
+    assert.equal(goalTypeLabel('follower'), 'Followers');
+    assert.equal(goalTypeLabel('new_subscription_count'), 'Subscribers');
+    assert.equal(goalTypeLabel('new_cheerer'), 'Cheerers');
+    assert.equal(goalTypeLabel('mystery_goal'), '');
 });

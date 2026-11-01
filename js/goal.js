@@ -95,7 +95,10 @@ function applyPalette(styleName) {
 
 function applyLiveSettings(s) {
     if (!s) return;
-    settings = { ...settings, ...s };
+    const { goalDescription: description, goalType: type, ...patch } = s;
+    if (typeof description === 'string') goalDescription = description;
+    if (typeof type === 'string') goalType = type;
+    settings = { ...settings, ...patch };
     const style = settings.goalStyle || 'grape';
     const pal = PALETTES[style] || PALETTES.grape;
     if (!settings.goalBarColor) {

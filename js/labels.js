@@ -12,9 +12,13 @@ const GOAL_TYPE_LABELS = {
     new_cheerer: 'Cheerers',
 };
 
+export function goalTypeLabel(type) {
+    return GOAL_TYPE_LABELS[type] || '';
+}
+
 export function resolveGoalLabel(override, description, type) {
     const o = String(override || '').trim();
     if (o) return o;
     if (description) return description;
-    return GOAL_TYPE_LABELS[type] || '';
+    return goalTypeLabel(type);
 }

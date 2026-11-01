@@ -1,6 +1,7 @@
 import {
     getSettings, saveSettings,
 } from './storage.js';
+import { goalTypeLabel } from './labels.js';
 import { createBridge } from './bridge.js';
 import {
     fetchCloudState,
@@ -109,11 +110,18 @@ function updatePreview() {
     }
 }
 
+function selectedGoal() {
+    return goals.find((g) => g.id === settings.selected_goal_id) || goals[0] || null;
+}
+
 function buildLivePreviewSettings() {
     const style = $goalStyle ? $goalStyle.value : (settings.goalStyle || 'grape');
     const pal = PALETTES[style] || PALETTES.grape;
+    const goal = selectedGoal();
     return {
         goalLabel: ($goalLabel ? $goalLabel.value : (settings.goalLabel || '')).trim(),
+        goalDescription: goal ? (goal.description || '') : '',
+        goalType: goal ? (goal.type || '') : '',
         goalTarget: settings.goalTarget || 100,
         goalBarColor: pal.colors[1] || '#946ef9',
         goalBarEnabled: true,
@@ -166,14 +174,16 @@ function renderGoals() {
         radio.checked = goal.id === settings.selected_goal_id;
         radio.style.marginRight = '8px';
 
+        const typeLabel = goalTypeLabel(goal.type) || goal.type;
+
         const span = document.createElement('span');
-        span.textContent = goal.description || goal.type || 'Untitled goal';
+        span.textContent = goal.description || typeLabel || 'Untitled goal';
         span.style.fontWeight = '600';
 
         const sub = document.createElement('div');
         sub.style.fontSize = '11px';
         sub.style.color = 'var(--muted)';
-        sub.textContent = goal.current_amount + ' / ' + goal.target_amount + '  ·  ' + goal.type;
+        sub.textContent = goal.current_amount + ' / ' + goal.target_amount + '  ·  ' + typeLabel;
 
         label.appendChild(radio);
         label.appendChild(span);
