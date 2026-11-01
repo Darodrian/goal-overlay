@@ -1,11 +1,15 @@
-import { TWITCH_CLIENT_ID, TWITCH_OAUTH_BASE } from './config.js';
+import { TWITCH_CLIENT_ID, TWITCH_OAUTH_BASE, SUPABASE_KEY } from './config.js';
 
 const TWITCH_API = 'https://api.twitch.tv/helix';
 const EVENT_SUB_WS = 'wss://eventsub.wss.twitch.tv/ws';
 
 // ---- Token: fetched from the Edge Function (handles refresh server-side) ----
 export async function getAccessToken(broadcasterId) {
-    const res = await fetch(`${TWITCH_OAUTH_BASE}/token?broadcaster_id=${encodeURIComponent(broadcasterId)}`);
+    const res = await fetch(`${TWITCH_OAUTH_BASE}/token?broadcaster_id=${encodeURIComponent(broadcasterId)}`, {
+        headers: {
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+    });
     if (res.status === 401) {
         throw new Error('token_expired');
     }
