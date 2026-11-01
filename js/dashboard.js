@@ -113,7 +113,7 @@ function buildLivePreviewSettings() {
     const style = $goalStyle ? $goalStyle.value : (settings.goalStyle || 'grape');
     const pal = PALETTES[style] || PALETTES.grape;
     return {
-        goalLabel: $goalLabel ? $goalLabel.value : (settings.goalLabel || ''),
+        goalLabel: ($goalLabel ? $goalLabel.value : (settings.goalLabel || '')).trim(),
         goalTarget: settings.goalTarget || 100,
         goalBarColor: pal.colors[1] || '#946ef9',
         goalBarEnabled: true,
@@ -232,7 +232,7 @@ async function saveSettingsToStorage() {
     const style = $goalStyle ? $goalStyle.value : 'grape';
     const pal = PALETTES[style] || PALETTES.grape;
     const s = {
-        goalLabel: $goalLabel ? $goalLabel.value : '',
+        goalLabel: ($goalLabel ? $goalLabel.value : '').trim(),
         goalTarget: settings.goalTarget || 100,
         goalBarColor: pal.colors[1] || '#946ef9',
         goalBarEnabled: true,

@@ -1,4 +1,5 @@
 import { createBridge } from './bridge.js';
+import { resolveGoalLabel } from './labels.js';
 import { getSettings, saveSettings, broadcasterId as getBroadcasterId } from './storage.js';
 import { fetchCloudState, saveCloudState } from './cloud.js';
 import { getAccessToken, fetchGoals, EventSubClient } from './twitch.js';
@@ -100,8 +101,8 @@ function applyLiveSettings(s) {
     if (!settings.goalBarColor) {
         settings.goalBarColor = pal.colors[1] || '#946ef9';
     }
-    if ($goalLabel && goalDescription) {
-        $goalLabel.textContent = settings.goalLabel || goalDescription;
+    if ($goalLabel) {
+        $goalLabel.textContent = resolveGoalLabel(settings.goalLabel, goalDescription, goalType);
     }
     if ($goalProgress) {
         $goalProgress.textContent = goalCurrentAmount + ' / ' + goalTargetAmount;
@@ -123,7 +124,7 @@ function renderGoal(goal) {
     goalCurrentAmount = normalizePoints(goal.current_amount) || 0;
 
     if ($goalLabel) {
-        $goalLabel.textContent = settings.goalLabel || goalDescription;
+        $goalLabel.textContent = resolveGoalLabel(settings.goalLabel, goalDescription, goalType);
     }
     if ($goalProgress) {
         $goalProgress.textContent = goalCurrentAmount + ' / ' + goalTargetAmount;
@@ -266,7 +267,7 @@ function initGoal() {
         settings.goalBarColor = pal.colors[1] || '#946ef9';
     }
 
-    if ($goalLabel) $goalLabel.textContent = settings.goalLabel || '';
+    if ($goalLabel) $goalLabel.textContent = resolveGoalLabel(settings.goalLabel, goalDescription, goalType);
     if ($goalProgress) $goalProgress.textContent = '0 / ' + settings.goalTarget;
 
     goalEnabled = settings.goalBarEnabled !== false;
@@ -283,6 +284,14 @@ function initGoal() {
     startEventSub();
     loadGoalsFromTwitch();
 }
+
+// ---- live preview (dashboard iframe) ----
+window.addEventListener('message', (ev) => {
+    if (ev.origin !== location.origin) return;
+    if (ev.source !== window.parent && ev.source !== window) return;
+    if (!ev.data || ev.data.type !== 'goal-preview') return;
+    applyLiveSettings(ev.data.settings);
+});
 
 // ---- entry point ----
 broadcasterId = getBroadcasterId();
