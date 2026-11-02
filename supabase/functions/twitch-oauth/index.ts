@@ -11,7 +11,7 @@ const TWITCH_CLIENT_ID = Deno.env.get("TWITCH_CLIENT_ID")!;
 const TWITCH_CLIENT_SECRET = Deno.env.get("TWITCH_CLIENT_SECRET")!;
 // Base URL of this Edge Function, e.g. https://<project-ref>.supabase.co/functions/v1/twitch-oauth
 const BASE_URL = Deno.env.get("BASE_URL")!;
-// Public URL of your dashboard, e.g. https://yourname.github.io/goal-overlay
+// Fallback dashboard URL (used when no ?redirect param is passed).
 const DASHBOARD_URL = Deno.env.get("DASHBOARD_URL")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -60,9 +60,13 @@ serve(async (req) => {
     try {
         // ---- GET /twitch-oauth/authorize ----
         if (path === "/twitch-oauth/authorize" && req.method === "GET") {
-            // Twitch authorizes the currently logged-in user; broadcaster_id is resolved
-            // from the access token via GET /helix/users. State is just CSRF protection.
-            const state = crypto.randomUUID();
+            // Optional ?redirect=<dashboard_url> lets the caller choose where
+            // Twitch redirects back after authorization. Falls back to
+            // DASHBOARD_URL (keeps goal-overlay working unchanged).
+            const redirectTarget = url.searchParams.get("redirect") ?? DASHBOARD_URL;
+            // state is echoed back by Twitch on callback; carry the redirect
+            // target inside it so we can return to the right dashboard.
+            const state = `${crypto.randomUUID()}|${encodeURIComponent(redirectTarget)}`;
             const params = new URLSearchParams({
                 client_id: TWITCH_CLIENT_ID,
                 redirect_uri: `${BASE_URL}/callback`,
@@ -80,8 +84,25 @@ serve(async (req) => {
             const state = url.searchParams.get("state");
             const error = url.searchParams.get("error");
 
+            // Recover the dashboard URL to redirect back to. state has the form
+            // "<uuid>|<encoded-redirect-url>"; fall back to DASHBOARD_URL.
+            let dashboardUrl = DASHBOARD_URL;
+            if (state) {
+                const sep = state.indexOf("|");
+                if (sep !== -1) {
+                    try {
+                        dashboardUrl = decodeURIComponent(state.slice(sep + 1));
+                    } catch { /* keep fallback */ }
+                }
+            }
+
+            const to = (pathname: string, params: Record<string, string> = {}) => {
+                const p = new URLSearchParams(params);
+                return `${dashboardUrl}/${pathname.replace(/^\/+/, "")}?${p.toString()}`;
+            };
+
             if (error || !code) {
-                return redirect(`${DASHBOARD_URL}/dashboard.html?error=${error ?? "missing_code"}`);
+                return redirect(to("dashboard.html", { error: error ?? "missing_code" }));
             }
 
             // Exchange code for tokens
@@ -99,7 +120,7 @@ serve(async (req) => {
 
             if (!tokenRes.ok) {
                 const text = await tokenRes.text();
-                return redirect(`${DASHBOARD_URL}/dashboard.html?error=token_exchange_failed`);
+                return redirect(to("dashboard.html", { error: "token_exchange_failed" }));
             }
 
             const tokens = await tokenRes.json();
@@ -116,13 +137,13 @@ serve(async (req) => {
             });
 
             if (!usersRes.ok) {
-                return redirect(`${DASHBOARD_URL}/dashboard.html?error=user_lookup_failed`);
+                return redirect(to("dashboard.html", { error: "user_lookup_failed" }));
             }
 
             const users = await usersRes.json();
             const user = users.data?.[0];
             if (!user) {
-                return redirect(`${DASHBOARD_URL}/dashboard.html?error=user_not_found`);
+                return redirect(to("dashboard.html", { error: "user_not_found" }));
             }
 
             const broadcasterId = user.id;
@@ -146,11 +167,11 @@ serve(async (req) => {
 
             if (upsertError) {
                 console.error("upsert error", upsertError);
-                return redirect(`${DASHBOARD_URL}/dashboard.html?error=token_save_failed`);
+                return redirect(to("dashboard.html", { error: "token_save_failed" }));
             }
 
             // Redirect back to dashboard with the broadcaster selected
-            return redirect(`${DASHBOARD_URL}/dashboard.html?connected=${broadcasterLogin}&broadcaster_id=${broadcasterId}`);
+            return redirect(to("dashboard.html", { connected: broadcasterLogin, broadcaster_id: broadcasterId }));
         }
 
         // ---- GET /twitch-oauth/token?broadcaster_id=... ----
