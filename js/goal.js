@@ -223,7 +223,6 @@ function disconnectOverlay(reason) {
         eventSub.disconnect();
         eventSub = null;
     }
-    $setupNotice.classList.add('show');
     console.log('Goal Overlay session invalid: ' + reason);
 }
 

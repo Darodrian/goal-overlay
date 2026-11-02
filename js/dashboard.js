@@ -366,6 +366,18 @@ if ($btnLogout) {
         broadcasterLogin = '';
         showConnected(false);
         if ($btnConnect) $btnConnect.hidden = false;
+        // Clear dashboard state so goals/preview don't show stale data.
+        if ($goalsList) {
+            $goalsList.innerHTML = '';
+            $goalsList.textContent = 'No active goals found for this channel.';
+        }
+        if ($preview) {
+            $preview.src = 'about:blank';
+            $preview.hidden = true;
+        }
+        if ($previewNote) {
+            $previewNote.textContent = 'Connect your Twitch account to preview the overlay.';
+        }
         flash('Disconnected');
     });
 }
