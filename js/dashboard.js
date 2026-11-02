@@ -35,6 +35,7 @@ const DEFAULTS = {
     overlayWidth: 600,
     overlayHeight: 100,
     goalStyle: 'grape',
+    goalFont: 'zpix',
     eventsFade: false,
     eventsFadeAfterMs: 10000,
 };
@@ -42,6 +43,7 @@ const DEFAULTS = {
 // DOM refs
 const $goalLabel = document.getElementById('goal-label');
 const $goalStyle = document.getElementById('goal-style');
+const $goalFont = document.getElementById('goal-font');
 const $overlayWidth = document.getElementById('overlay-width');
 const $btnConnect = document.getElementById('btn-connect');
 const $btnCopyUrl = document.getElementById('btn-copy-url');
@@ -129,6 +131,7 @@ function buildLivePreviewSettings() {
         overlayWidth: parseInt($overlayWidth ? $overlayWidth.value : 600, 10) || 600,
         overlayHeight: 100,
         goalStyle: style,
+        goalFont: settings.goalFont || 'zpix',
         selected_goal_id: settings.selected_goal_id || '',
     };
 }
@@ -148,6 +151,7 @@ function updatePreviewLive() {
 function applySettingsToForm(s) {
     if ($goalLabel) $goalLabel.value = s.goalLabel || '';
     if ($goalStyle) $goalStyle.value = s.goalStyle || 'grape';
+    if ($goalFont) $goalFont.value = s.goalFont || 'zpix';
     if ($overlayWidth) $overlayWidth.value = s.overlayWidth || 600;
     updatePreviewLive();
 }
@@ -250,6 +254,7 @@ async function saveSettingsToStorage() {
         overlayWidth: parseInt($overlayWidth ? $overlayWidth.value : 600, 10) || 600,
         overlayHeight: 100,
         goalStyle: style,
+        goalFont: $goalFont ? $goalFont.value : (settings.goalFont || 'zpix'),
         selected_goal_id: settings.selected_goal_id || '',
     };
     saveSettings(broadcasterId, s);
@@ -388,6 +393,7 @@ if ($btnSave) {
 
 if ($goalLabel) $goalLabel.addEventListener('input', updatePreviewLive);
 if ($goalStyle) $goalStyle.addEventListener('change', updatePreviewLive);
+if ($goalFont) $goalFont.addEventListener('change', updatePreviewLive);
 if ($overlayWidth) $overlayWidth.addEventListener('input', updatePreviewLive);
 
 // ---- init ----

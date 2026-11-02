@@ -115,6 +115,7 @@ function applyLiveSettings(s) {
     if (bar) bar.style.display = goalEnabled ? '' : 'none';
     document.documentElement.style.setProperty('--goal-color-1', settings.goalBarColor);
     applyPalette(style);
+    document.documentElement.style.setProperty('--goal-font-family', settings.goalFont || 'zpix');
     applySize();
     updateBar();
 }

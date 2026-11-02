@@ -5,8 +5,15 @@
     font-display: swap;
 }
 
+@font-face {
+    font-family: 'ComingSoon';
+    src: url('../assets/fonts/ComingSoon-Regular.woff2') format('woff2');
+    font-display: swap;
+}
+
 :root {
     --goal-color-1: #946ef9;
+    --goal-font-family: 'zpix';
     --goal-color-2: #7a53f8;
     --goal-color-3: #c5b5fb;
     --goal-color-border: #000000;
@@ -21,7 +28,7 @@ html, body {
     padding: 0;
     overflow: hidden;
     background: transparent;
-    font-family: 'zpix', 'Montserrat', sans-serif;
+    font-family: var(--goal-font-family), 'Montserrat', sans-serif;
     font-size: 20px;
     color: var(--goal-color-text, #c5b5fb);
     text-shadow: 2px 2px 0 var(--goal-color-text-shadow, #000000);
