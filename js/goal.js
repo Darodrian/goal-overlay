@@ -203,6 +203,9 @@ async function connectRoom() {
         b.onKeyChanged((payload) => {
             disconnectOverlay('Key changed.');
         });
+        b.onDisconnect(() => {
+            disconnectOverlay('Panel desconectó la sesión.');
+        });
         await b.connect();
         bridge = b;
         b.sendHello();

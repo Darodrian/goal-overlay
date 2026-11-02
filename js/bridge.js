@@ -7,7 +7,7 @@ import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 const SUPA_MODULE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
 
 export function createBridge(room) {
-    const handlers = { status: [], hello: [], set: [], addPoints: [], resetPoints: [], keyChanged: [], setPoints: [] };
+    const handlers = { status: [], hello: [], set: [], addPoints: [], resetPoints: [], keyChanged: [], setPoints: [], disconnect: [] };
     let channel = null;
     let client = null;
     let subscribed = false;
@@ -33,6 +33,7 @@ export function createBridge(room) {
         listen('resetPoints', (p) => handlers.resetPoints.forEach((h) => h(p)));
         listen('keyChanged', (p) => handlers.keyChanged.forEach((h) => h(p)));
         listen('setPoints', (p) => handlers.setPoints.forEach((h) => h(p)));
+        listen('disconnect', (p) => handlers.disconnect.forEach((h) => h(p)));
         return new Promise((resolve, reject) => {
             let settled = false;
             const finish = (fn, arg) => {
@@ -69,6 +70,7 @@ export function createBridge(room) {
         sendResetPoints(payload) { send('resetPoints', payload); },
         sendKeyChanged(payload) { send('keyChanged', payload); },
         send(event, payload) { send(event, payload); },
+        sendDisconnect() { send('disconnect', { at: Date.now() }); },
         onStatus(fn) { handlers.status.push(fn); },
         onHello(fn) { handlers.hello.push(fn); },
         onSet(fn) { handlers.set.push(fn); },
@@ -76,5 +78,6 @@ export function createBridge(room) {
         onResetPoints(fn) { handlers.resetPoints.push(fn); },
         onKeyChanged(fn) { handlers.keyChanged.push(fn); },
         onSetPoints(fn) { handlers.setPoints.push(fn); },
+        onDisconnect(fn) { handlers.disconnect.push(fn); },
     };
 }

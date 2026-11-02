@@ -333,6 +333,19 @@ if ($btnCopyUrl) {
 if ($btnLogout) {
     $btnLogout.addEventListener('click', async () => {
         if (!broadcasterId) return;
+        // Notificar al overlay que se desconectó (si hay sala activa).
+        try {
+            if (bridge && bridge.isConnected()) {
+                bridge.sendDisconnect();
+            } else {
+                const tmp = createBridge(broadcasterId);
+                await tmp.connect();
+                tmp.sendDisconnect();
+                await tmp.leave();
+            }
+        } catch (e) {
+            console.warn('[dashboard] send disconnect failed', e?.message ?? e);
+        }
         try {
             await fetch(`${TWITCH_OAUTH_BASE}/revoke?broadcaster_id=${encodeURIComponent(broadcasterId)}`, {
                 method: 'POST',
