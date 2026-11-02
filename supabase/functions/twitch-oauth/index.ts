@@ -95,6 +95,9 @@ serve(async (req) => {
                     } catch { /* keep fallback */ }
                 }
             }
+            // Normaliza: quita barras finales para evitar rutas duplicadas
+            // (ej. .../dashboard.html/dashboard.html).
+            dashboardUrl = dashboardUrl.replace(/\/$/, "");
 
             const to = (pathname: string, params: Record<string, string> = {}) => {
                 const p = new URLSearchParams(params);
@@ -172,6 +175,26 @@ serve(async (req) => {
 
             // Redirect back to dashboard with the broadcaster selected
             return redirect(to("dashboard.html", { connected: broadcasterLogin, broadcaster_id: broadcasterId }));
+        }
+
+        // ---- POST /twitch-oauth/revoke ----
+        if (path === "/twitch-oauth/revoke" && (req.method === "POST" || req.method === "GET")) {
+            const broadcasterId = url.searchParams.get("broadcaster_id");
+            if (!broadcasterId) {
+                return json({ error: "missing broadcaster_id" }, 400, corsHeaders);
+            }
+
+            const { error: revokeError } = await supabase
+                .from("twitch_tokens")
+                .delete()
+                .eq("broadcaster_id", broadcasterId);
+
+            if (revokeError) {
+                console.error("revoke error", revokeError);
+                return json({ error: "revoke_failed" }, 500, corsHeaders);
+            }
+
+            return json({ ok: true }, 200, corsHeaders);
         }
 
         // ---- GET /twitch-oauth/token?broadcaster_id=... ----

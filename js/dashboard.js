@@ -7,7 +7,7 @@ import {
     fetchCloudState,
     saveCloudState,
 } from './cloud.js';
-import { TWITCH_OAUTH_BASE } from './config.js';
+import { TWITCH_OAUTH_BASE, SUPABASE_KEY } from './config.js';
 import { getAccessToken, fetchGoals } from './twitch.js';
 
 const PALETTES = {
@@ -45,6 +45,7 @@ const $goalStyle = document.getElementById('goal-style');
 const $overlayWidth = document.getElementById('overlay-width');
 const $btnConnect = document.getElementById('btn-connect');
 const $btnCopyUrl = document.getElementById('btn-copy-url');
+const $btnLogout = document.getElementById('btn-logout');
 const $btnSave = document.getElementById('btn-save');
 const $dotOv = document.getElementById('dot-ov');
 const $statusOv = document.getElementById('status-ov');
@@ -325,6 +326,30 @@ if ($btnCopyUrl) {
         const url = buildOverlayUrl(broadcasterId);
         await copyText(url);
         flash('Overlay URL copied');
+    });
+}
+
+// ---- Logout ----
+if ($btnLogout) {
+    $btnLogout.addEventListener('click', async () => {
+        if (!broadcasterId) return;
+        try {
+            await fetch(`${TWITCH_OAUTH_BASE}/revoke?broadcaster_id=${encodeURIComponent(broadcasterId)}`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${SUPABASE_KEY}`,
+                },
+            });
+        } catch (e) {
+            console.warn('[dashboard] revoke token failed', e?.message ?? e);
+        }
+        localStorage.removeItem('goal_overlay_broadcaster_id');
+        localStorage.removeItem('goal_overlay_broadcaster_login');
+        broadcasterId = '';
+        broadcasterLogin = '';
+        showConnected(false);
+        if ($btnConnect) $btnConnect.hidden = false;
+        flash('Disconnected');
     });
 }
 

@@ -22,8 +22,11 @@
       <h2 id="connection-title">Connect Twitch</h2>
       <button type="button" id="btn-connect">Connect Twitch account</button>
       <div id="connection-connected" hidden>
-        <span id="connection-status">Connected</span>
-        <button type="button" id="btn-copy-url" disabled>Copy overlay URL</button>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span id="connection-status">Connected</span>
+          <button type="button" id="btn-logout" style="margin-left:auto;">Disconnect</button>
+        </div>
+        <button type="button" id="btn-copy-url" disabled style="margin-top:8px;">Copy overlay URL</button>
       </div>
     </div>
 
