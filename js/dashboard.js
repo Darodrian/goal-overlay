@@ -346,6 +346,10 @@ if ($btnLogout) {
         } catch (e) {
             console.warn('[dashboard] send disconnect failed', e?.message ?? e);
         }
+        // Cerrar puente de tiempo real para que el overlay deje de recibir mensajes.
+        try {
+            if (bridge) { await bridge.leave(); bridge = null; }
+        } catch (e) { console.warn('[dashboard] leave bridge failed', e?.message ?? e); }
         try {
             await fetch(`${TWITCH_OAUTH_BASE}/revoke?broadcaster_id=${encodeURIComponent(broadcasterId)}`, {
                 method: 'POST',
