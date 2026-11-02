@@ -19,7 +19,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 function json(body: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
     return new Response(JSON.stringify(body), {
         status,
-        headers: { "Content-Type": "application/json", ...extraHeaders },
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", ...extraHeaders },
     });
 }
 
