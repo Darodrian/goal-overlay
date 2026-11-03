@@ -71,7 +71,7 @@ serve(async (req) => {
                 client_id: TWITCH_CLIENT_ID,
                 redirect_uri: `${BASE_URL}/callback`,
                 response_type: "code",
-                scope: "channel:read:cheers channel:read:goals",
+                scope: "bits:read channel:read:cheers channel:read:goals",
                 state: state,
             });
 
