@@ -121,6 +121,7 @@ function buildLivePreviewSettings() {
     const style = $goalStyle ? $goalStyle.value : (settings.goalStyle || 'grape');
     const pal = PALETTES[style] || PALETTES.grape;
     const goal = selectedGoal();
+    const font = $goalFont ? $goalFont.value : (settings.goalFont || 'zpix');
     return {
         goalLabel: ($goalLabel ? $goalLabel.value : (settings.goalLabel || '')).trim(),
         goalDescription: goal ? (goal.description || '') : '',
@@ -131,7 +132,7 @@ function buildLivePreviewSettings() {
         overlayWidth: parseInt($overlayWidth ? $overlayWidth.value : 600, 10) || 600,
         overlayHeight: 100,
         goalStyle: style,
-        goalFont: settings.goalFont || 'zpix',
+        goalFont: font,
         selected_goal_id: settings.selected_goal_id || '',
     };
 }
