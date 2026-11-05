@@ -33,20 +33,16 @@ const DEFAULTS = {
 
 let broadcasterId = '';
 let settings = { ...DEFAULTS };
-let goalCurrentAmount = 0;
-let goalTargetAmount = 100;
-let goalDescription = '';
-let goalType = '';
-let goalEnabled = true;
 let bridge = null;
 let eventSub = null;
 let pointsDirty = false;
 const embedded = window.parent !== window;
 
+// Per-goal state, keyed by Twitch goal id.
+export const goalsById = new Map();
+
 // DOM refs
-const $goalLabel = document.getElementById('goal-label');
-const $goalProgress = document.getElementById('goal-progress');
-const $goalFill = document.getElementById('goal-fill');
+const $goalsList = document.getElementById('goals-list');
 const $goalContainer = document.getElementById('goal-container');
 const $subEvents = document.getElementById('sub-events');
 const $setupNotice = document.getElementById('setup-notice');
@@ -60,18 +56,18 @@ function normalizePoints(value) {
     return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
 }
 
-function updateBar() {
-    const pct = goalTargetAmount > 0
-        ? Math.min(goalCurrentAmount / goalTargetAmount, 1) * 100
+function updateBar(goal) {
+    const { currentAmount, targetAmount, fill: fillEl, progress: progressEl } = goal;
+    const pct = targetAmount > 0
+        ? Math.min(currentAmount / targetAmount, 1) * 100
         : 0;
-    $goalFill.style.width = pct + '%';
-    $goalProgress.textContent = goalCurrentAmount + ' / ' + goalTargetAmount;
+    fillEl.style.width = pct + '%';
+    progressEl.textContent = currentAmount + ' / ' + targetAmount;
     document.documentElement.style.setProperty('--goal-color-1', settings.goalBarColor);
 }
 
 function applySize() {
     $goalContainer.style.width = settings.overlayWidth + 'px';
-    $goalContainer.style.height = settings.overlayHeight + 'px';
     const wrap = document.getElementById('sub-events-wrap');
     if (wrap) wrap.style.width = settings.overlayWidth + 'px';
     const hist = document.querySelector('.sub-events-history');
@@ -95,45 +91,78 @@ function applyPalette(styleName) {
 
 function applyLiveSettings(s) {
     if (!s) return;
-    const { goalDescription: description, goalType: type, ...patch } = s;
-    if (typeof description === 'string') goalDescription = description;
-    if (typeof type === 'string') goalType = type;
-    settings = { ...settings, ...patch };
+    settings = { ...settings, ...s };
     const style = settings.goalStyle || 'grape';
     const pal = PALETTES[style] || PALETTES.grape;
     if (!settings.goalBarColor) {
         settings.goalBarColor = pal.colors[1] || '#946ef9';
     }
-    if ($goalLabel) {
-        $goalLabel.textContent = resolveGoalLabel(settings.goalLabel, goalDescription, goalType);
-    }
-    if ($goalProgress) {
-        $goalProgress.textContent = goalCurrentAmount + ' / ' + goalTargetAmount;
-    }
-    goalEnabled = settings.goalBarEnabled !== false;
-    const bar = document.querySelector('.goal-bar');
-    if (bar) bar.style.display = goalEnabled ? '' : 'none';
+    const goalEnabled = settings.goalBarEnabled !== false;
+    document.querySelectorAll('.goal-bar').forEach((bar) => {
+        bar.style.display = goalEnabled ? '' : 'none';
+    });
     document.documentElement.style.setProperty('--goal-color-1', settings.goalBarColor);
     applyPalette(style);
     document.documentElement.style.setProperty('--goal-font-family', settings.goalFont || 'zpix');
     applySize();
-    updateBar();
+    goalsById.forEach((goal) => {
+        updateBar(goal);
+    });
 }
 
-function renderGoal(goal) {
-    if (!goal) return;
-    goalDescription = goal.description || '';
-    goalType = goal.type || '';
-    goalTargetAmount = normalizePoints(goal.target_amount) || 100;
-    goalCurrentAmount = normalizePoints(goal.current_amount) || 0;
+function buildGoalBar(goal) {
+    const bar = document.createElement('div');
+    bar.className = 'goal-bar';
 
-    if ($goalLabel) {
-        $goalLabel.textContent = resolveGoalLabel(settings.goalLabel, goalDescription, goalType);
-    }
-    if ($goalProgress) {
-        $goalProgress.textContent = goalCurrentAmount + ' / ' + goalTargetAmount;
-    }
-    updateBar();
+    const header = document.createElement('div');
+    header.className = 'goal-header';
+    const label = document.createElement('span');
+    label.className = 'goal-label';
+    const progress = document.createElement('span');
+    progress.className = 'goal-progress';
+    header.appendChild(label);
+    header.appendChild(progress);
+
+    const track = document.createElement('div');
+    track.className = 'goal-track';
+    const fill = document.createElement('div');
+    fill.className = 'goal-fill';
+    track.appendChild(fill);
+
+    bar.appendChild(header);
+    bar.appendChild(track);
+
+    return { bar, label, progress, fill };
+}
+
+export function renderGoal(goal) {
+    if (!goal) return;
+    if (goalsById.has(goal.id)) return;
+
+    const description = goal.description || '';
+    const type = goal.type || '';
+    const targetAmount = normalizePoints(goal.target_amount) || 100;
+    const currentAmount = normalizePoints(goal.current_amount) || 0;
+
+    const { bar, label, progress, fill } = buildGoalBar(goal);
+    label.textContent = resolveGoalLabel(settings.goalLabel, description, type);
+    progress.textContent = currentAmount + ' / ' + targetAmount;
+
+    $goalsList.appendChild(bar);
+
+    goalsById.set(goal.id, {
+        id: goal.id,
+        description,
+        type,
+        targetAmount,
+        currentAmount,
+        bar,
+        label,
+        progress,
+        fill,
+    });
+
+    updateBar(goalsById.get(goal.id));
 }
 
 function handleGoalProgress(event, info) {
@@ -143,20 +172,26 @@ function handleGoalProgress(event, info) {
     }
     if (!event) return;
 
+    const goalId = event.id;
     const current = normalizePoints(event.current_amount);
     const target = normalizePoints(event.target_amount);
-    if (current === goalCurrentAmount && target === goalTargetAmount) return;
+    const goal = goalsById.get(goalId);
+    if (!goal) {
+        console.warn('[overlay] goal progress for unknown goal id:', goalId);
+        return;
+    }
+    if (current === goal.currentAmount && target === goal.targetAmount) return;
 
-    goalCurrentAmount = current;
-    goalTargetAmount = target;
-    updateBar();
+    goal.currentAmount = current;
+    goal.targetAmount = target;
+    updateBar(goal);
 
     // Fade-out style flash on change
     const item = document.createElement('div');
     item.className = 'sub-event';
     const text = document.createElement('span');
     text.className = 'sub-event-text';
-    text.textContent = 'Goal updated: ' + current + ' / ' + target;
+    text.textContent = 'Goal updated: ' + goal.label.textContent + ' ' + current + ' / ' + target;
     const pts = document.createElement('span');
     pts.className = 'sub-event-points';
     pts.textContent = '';
@@ -244,19 +279,30 @@ async function loadGoalsFromTwitch() {
     try {
         const token = await getAccessToken(broadcasterId);
         const goals = await fetchGoals(broadcasterId, token);
-        // Find the selected goal from cloud state, or use the first active one
-        let selected = null;
-        if (settings.selected_goal_id) {
-            selected = goals.find(g => g.id === settings.selected_goal_id);
+        const activeIds = new Set();
+
+        for (const goal of goals) {
+            activeIds.add(goal.id);
+            renderGoal(goal);
         }
-        if (!selected && goals.length > 0) {
-            selected = goals[0];
+
+        // Remove goal bars that are no longer active on Twitch.
+        for (const [id, goal] of goalsById.entries()) {
+            if (!activeIds.has(id)) {
+                if (goal.bar && goal.bar.parentNode) {
+                    goal.bar.parentNode.removeChild(goal.bar);
+                }
+                goalsById.delete(id);
+            }
         }
-        if (selected) {
-            renderGoal(selected);
-            settings.selected_goal_id = selected.id;
+
+        // Keep selected_goal_id in sync with whatever is active (for dashboard state).
+        if (settings.selected_goal_id && !activeIds.has(settings.selected_goal_id) && goals.length > 0) {
+            settings.selected_goal_id = goals[0].id;
             saveSettings(broadcasterId, settings);
-        } else {
+        }
+
+        if (goals.length === 0) {
             console.warn('[overlay] no active goals found for broadcaster', broadcasterId);
         }
     } catch (e) {
@@ -273,18 +319,15 @@ function initGoal() {
         settings.goalBarColor = pal.colors[1] || '#946ef9';
     }
 
-    if ($goalLabel) $goalLabel.textContent = resolveGoalLabel(settings.goalLabel, goalDescription, goalType);
-    if ($goalProgress) $goalProgress.textContent = '0 / ' + settings.goalTarget;
-
-    goalEnabled = settings.goalBarEnabled !== false;
-    if (!goalEnabled) {
-        document.querySelector('.goal-bar').style.display = 'none';
-    }
+    const goalEnabled = settings.goalBarEnabled !== false;
+    document.querySelectorAll('.goal-bar').forEach((bar) => {
+        bar.style.display = goalEnabled ? '' : 'none';
+    });
 
     document.documentElement.style.setProperty('--goal-color-1', settings.goalBarColor);
     applyPalette(style);
+    document.documentElement.style.setProperty('--goal-font-family', settings.goalFont || 'zpix');
     applySize();
-    updateBar();
 
     connectRoom();
     startEventSub();
