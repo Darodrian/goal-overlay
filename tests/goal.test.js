@@ -67,7 +67,7 @@ globalThis.location = { hash: '', search: '' };
 globalThis.localStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
 
 const mod = await import('../js/goal.js');
-const { renderGoal, goalsById } = mod;
+const { renderGoal, goalsById, settings, applyLiveSettings } = mod;
 
 function reset() {
     elements.length = 0;
@@ -113,4 +113,17 @@ test('subscription type resolves to "Subscribers" when no description', () => {
     reset();
     renderGoal({ id: 'g1', description: '', type: 'subscription', target_amount: 300, current_amount: 150 });
     assert.equal(goalsById.get('g1').label.textContent, 'Subscribers');
+});
+
+test('caption override updates labels on all existing bars when settings change', () => {
+    reset();
+    renderGoal({ id: 'g1', description: 'Followers', type: 'follower', target_amount: 100, current_amount: 40 });
+    renderGoal({ id: 'g2', description: 'Plus Program', type: 'subscription', target_amount: 300, current_amount: 150 });
+
+    // simulate dashboard changing the caption override
+    settings.goalLabel = 'Custom caption';
+    applyLiveSettings({ goalLabel: 'Custom caption' });
+
+    assert.equal(goalsById.get('g1').label.textContent, 'Custom caption');
+    assert.equal(goalsById.get('g2').label.textContent, 'Custom caption');
 });

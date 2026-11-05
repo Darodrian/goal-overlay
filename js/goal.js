@@ -32,7 +32,7 @@ const DEFAULTS = {
 };
 
 let broadcasterId = '';
-let settings = { ...DEFAULTS };
+export let settings = { ...DEFAULTS };
 let bridge = null;
 let eventSub = null;
 let pointsDirty = false;
@@ -89,7 +89,7 @@ function applyPalette(styleName) {
     document.body.dataset.goalStyle = style;
 }
 
-function applyLiveSettings(s) {
+export function applyLiveSettings(s) {
     if (!s) return;
     settings = { ...settings, ...s };
     const style = settings.goalStyle || 'grape';
@@ -106,6 +106,7 @@ function applyLiveSettings(s) {
     document.documentElement.style.setProperty('--goal-font-family', settings.goalFont || 'zpix');
     applySize();
     goalsById.forEach((goal) => {
+        goal.label.textContent = resolveGoalLabel(settings.goalLabel, goal.description, goal.type);
         updateBar(goal);
     });
 }
